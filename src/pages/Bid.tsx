@@ -44,13 +44,25 @@ export function Bid() {
       <div className="bid-charts">
         <section className="card">
           <h3>Win probability by margin</h3>
-          <LineChart curve={bid.curve} scenarios={bid.scenarios} y={(p) => p.estimated_win_probability} fmt={pct} max={1} />
+          <LineChart
+            id="win"
+            color="#0785ff"
+            curve={bid.curve}
+            scenarios={bid.scenarios}
+            recommended={bid.recommended}
+            y={(p) => p.estimated_win_probability}
+            fmt={pct}
+            max={1}
+          />
         </section>
         <section className="card">
           <h3>Expected contribution by margin</h3>
           <LineChart
+            id="contribution"
+            color="#7b61ff"
             curve={bid.curve}
             scenarios={bid.scenarios}
+            recommended={bid.recommended}
             y={(p) => p.expected_contribution_chf}
             fmt={(v) => (v === 0 ? 'CHF 0' : `CHF ${Math.round(v / 1000)}k`)}
           />
@@ -122,32 +134,56 @@ function ScenarioCard({ s, best }: { s: BidScenario; best: boolean }) {
   )
 }
 
+/** Smooth path through the points (monotone cubic, so the curve never overshoots the data). */
+function smooth(pts: [number, number][]) {
+  const n = pts.length
+  if (n < 3) return pts.map(([x, y], i) => `${i ? 'L' : 'M'}${x},${y}`).join('')
+  const d = pts.slice(1).map(([x, y], i) => (y - pts[i][1]) / (x - pts[i][0]))
+  const m = pts.map((_, i) => (i === 0 ? d[0] : i === n - 1 ? d[n - 2] : d[i - 1] * d[i] <= 0 ? 0 : (d[i - 1] + d[i]) / 2))
+  let out = `M${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}`
+  for (let i = 0; i < n - 1; i++) {
+    const [x0, y0] = pts[i]
+    const [x1, y1] = pts[i + 1]
+    const h = (x1 - x0) / 3
+    out += `C${(x0 + h).toFixed(1)},${(y0 + m[i] * h).toFixed(1)} ${(x1 - h).toFixed(1)},${(y1 - m[i + 1] * h).toFixed(1)} ${x1.toFixed(1)},${y1.toFixed(1)}`
+  }
+  return out
+}
+
 function LineChart({
+  id,
   curve,
   scenarios,
+  recommended,
   y,
   fmt,
   max,
+  color,
 }: {
+  id: string
   curve: BidPoint[]
   scenarios: BidScenario[]
+  recommended: string
   y: (p: BidPoint) => number
   fmt: (v: number) => string
   max?: number
+  color: string
 }) {
   const [hover, setHover] = useState<number | null>(null)
-  const W = 520
-  const H = 220
-  const L = 64
-  const R = 14
-  const T = 16
-  const B = 30
+  const W = 760
+  const H = 290
+  const L = 62
+  const R = 18
+  const T = 30
+  const B = 34
   const xMax = curve[curve.length - 1].margin_pct
-  const yMax = max ?? niceCeil(Math.max(...curve.map(y)) * 1.05)
+  const yMax = max ?? niceCeil(Math.max(...curve.map(y)) * 1.08)
   const sx = (m: number) => L + (m / xMax) * (W - L - R)
   const sy = (v: number) => T + (1 - v / yMax) * (H - T - B)
-  const path = curve.map((p, i) => `${i ? 'L' : 'M'}${sx(p.margin_pct).toFixed(1)},${sy(y(p)).toFixed(1)}`).join('')
-  const area = `${path}L${sx(xMax)},${sy(0)}L${sx(0)},${sy(0)}Z`
+  const path = smooth(curve.map((p) => [sx(p.margin_pct), sy(y(p))]))
+  const area = `${path}L${sx(xMax).toFixed(1)},${sy(0)}L${sx(0)},${sy(0)}Z`
+  const margins = scenarios.map((s) => s.margin_pct)
+  const band = [Math.min(...margins), Math.max(...margins)]
   const h = hover != null ? curve[hover] : null
   return (
     <div className="chart-wrap">
@@ -162,36 +198,62 @@ function LineChart({
           setHover(Math.max(0, Math.min(curve.length - 1, i)))
         }}
       >
+        <defs>
+          <linearGradient id={`fill-${id}`} x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stopColor={color} stopOpacity={0.28} />
+            <stop offset="100%" stopColor={color} stopOpacity={0.02} />
+          </linearGradient>
+          <filter id={`glow-${id}`} x="-10%" y="-10%" width="120%" height="140%">
+            <feDropShadow dx="0" dy="3" stdDeviation="3" floodColor={color} floodOpacity="0.28" />
+          </filter>
+          <clipPath id={`plot-${id}`}>
+            <rect x={L} y={0} width={W - L - R} height={sy(0)} />
+          </clipPath>
+        </defs>
+        <rect x={sx(band[0])} y={T - 6} width={sx(band[1]) - sx(band[0])} height={H - T - B + 6} rx={8} className="band" />
+        <text x={(sx(band[0]) + sx(band[1])) / 2} y={T - 12} className="axis band-label" textAnchor="middle">
+          bid range
+        </text>
         {[0, 0.25, 0.5, 0.75, 1].map((f) => (
           <g key={f}>
-            <line x1={L} x2={W - R} y1={sy(f * yMax)} y2={sy(f * yMax)} className="grid" />
-            <text x={L - 8} y={sy(f * yMax) + 4} className="axis" textAnchor="end">
+            <line x1={L} x2={W - R} y1={sy(f * yMax)} y2={sy(f * yMax)} className={f ? 'grid' : 'baseline'} />
+            <text x={L - 10} y={sy(f * yMax) + 4} className="axis" textAnchor="end">
               {fmt(f * yMax)}
             </text>
           </g>
         ))}
         {[0, 2, 4, 6, 8, 10, 12].filter((m) => m <= xMax).map((m) => (
-          <text key={m} x={sx(m)} y={H - 10} className="axis" textAnchor="middle">
+          <text key={m} x={sx(m)} y={H - 12} className="axis" textAnchor="middle">
             {m}%
           </text>
         ))}
-        <path d={area} className="area" />
-        <path d={path} className="line" />
-        {scenarios.map((s) => {
+        <g clipPath={`url(#plot-${id})`}>
+          <path d={area} fill={`url(#fill-${id})`} />
+          <path d={path} className="line" stroke={color} filter={`url(#glow-${id})`} />
+        </g>
+        {scenarios.map((s, i) => {
           const v = y({ ...curve[0], ...s })
+          const tone = TONE[s.scenario]
+          const label = s.scenario === recommended ? `${s.scenario} ★` : s.scenario
+          const w = label.length * 6.2 + 14
           return (
             <g key={s.scenario}>
-              <circle cx={sx(s.margin_pct)} cy={sy(v)} r={5.5} fill={TONE[s.scenario]} stroke="#fff" strokeWidth={2} />
-              <text x={sx(s.margin_pct)} y={sy(v) - 11} className="axis label" textAnchor="middle">
-                {s.scenario}
-              </text>
+              <line x1={sx(s.margin_pct)} x2={sx(s.margin_pct)} y1={sy(v)} y2={sy(0)} stroke={tone} className="drop" />
+              <circle cx={sx(s.margin_pct)} cy={sy(v)} r={9} fill={tone} opacity={0.18} />
+              <circle cx={sx(s.margin_pct)} cy={sy(v)} r={5} fill={tone} stroke="#fff" strokeWidth={2} />
+              <g transform={`translate(${sx(s.margin_pct) - w / 2},${sy(v) + (i % 2 ? 14 : -30)})`}>
+                <rect width={w} height={18} rx={9} fill={tone} />
+                <text x={w / 2} y={12.5} className="pill-label" textAnchor="middle">
+                  {label}
+                </text>
+              </g>
             </g>
           )
         })}
         {h && (
           <g>
             <line x1={sx(h.margin_pct)} x2={sx(h.margin_pct)} y1={T} y2={H - B} className="crosshair" />
-            <circle cx={sx(h.margin_pct)} cy={sy(y(h))} r={4} className="hover-dot" />
+            <circle cx={sx(h.margin_pct)} cy={sy(y(h))} r={5} fill="#fff" stroke={color} strokeWidth={2.5} />
           </g>
         )}
       </svg>
@@ -218,7 +280,7 @@ function Scenarios() {
         <div>
           <h3>Scenario comparison</h3>
           <p className="muted">
-            Save the current settings, change parameters here or under Calculation → Project build-up, save again and compare.
+            Save the current settings, change parameters here or under Review → Project build-up, save again and compare.
             Position edits stay as they are when you restore a scenario.
           </p>
         </div>

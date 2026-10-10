@@ -217,7 +217,7 @@ function Dashboard() {
   const m = metrics(e.positions)
   const meta = e.tender.meta
   const systems = systemsOf(e.positions)
-  const tabs = ['Dashboard', 'Positions', 'Review', 'Systems', 'Calculation', 'Bid', 'Export', 'Details']
+  const tabs = ['Dashboard', 'Positions', 'Review', 'Systems', 'Bid', 'Export', 'Details']
   const ready = m.open === 0
   return (
     <>
@@ -288,7 +288,7 @@ function Dashboard() {
             className="metric card"
             key={label}
             onClick={() => {
-              if (pill === 'value') return navigate('/calculation')
+              if (pill === 'value') return navigate('/review')
               filter({ pill, system: 'all', search: '', only: null })
               navigate(pill === 'decision' ? '/review' : '/positions')
             }}

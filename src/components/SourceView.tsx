@@ -27,13 +27,17 @@ export function SourceView({
   pages,
   compact = false,
   zoomable = false,
+  priced,
 }: {
   tenderId: string
   position: Position
   pages: number
   compact?: boolean
   zoomable?: boolean
+  /** show the priced tender (same page numbers, price annex appended) instead of the original */
+  priced?: { key: string; pages: number }
 }) {
+  const total = priced?.pages ?? pages
   const src = useSource(tenderId, position.lv_id)
   const [page, setPage] = useState(position.source_page)
   const [zoom, setZoom] = useState(100)
@@ -61,9 +65,9 @@ export function SourceView({
             <ChevronLeft size={15} />
           </button>
           <span>
-            Page <b>{page}</b> / {pages}
+            Page <b>{page}</b> / {total}
           </span>
-          <button className="icon-button" aria-label="Next page" disabled={page >= pages} onClick={() => setPage(page + 1)}>
+          <button className="icon-button" aria-label="Next page" disabled={page >= total} onClick={() => setPage(page + 1)}>
             <ChevronRight size={15} />
           </button>
           {page !== position.source_page && (
@@ -94,7 +98,9 @@ export function SourceView({
       </div>
       <div ref={view} className="document-viewport source-viewport">
         <div ref={paper} className="source-paper" style={{ width: `${zoom}%` }}>
-          <img src={api.pageUrl(tenderId, page)} alt={`Tender page ${page}`} onLoad={() => setLoaded(true)} />
+          <img
+            src={priced ? api.pricedLvPageUrl(tenderId, page, priced.key) : api.pageUrl(tenderId, page)}
+            alt={`${priced ? 'Priced tender' : 'Tender'} page ${page}`} onLoad={() => setLoaded(true)} />
           {marks?.block && <i className="hl-block" style={boxStyle(marks.block)} />}
           {marks?.lines.map((b, i) => <i key={i} className="hl-line" style={boxStyle(b)} />)}
         </div>
