@@ -54,6 +54,7 @@ export function BuildUpView({ estimate, onParams }: Props) {
     return STATUS_ORDER.filter((s) => m.has(s)).map((s) => [s, m.get(s)!] as const)
   }, [positions])
   const positionsTotal = positions.reduce((s, p) => s + p.direct_position_cost_chf, 0)
+  const awaitingPrice = positions.filter((p) => p.status === 'supplier_quote_required' && p.material_cost_chf === 0).length
 
   return (
     <div className="buildup">
@@ -143,6 +144,11 @@ export function BuildUpView({ estimate, onParams }: Props) {
           {STATUS_META.supplier_quote_required.label} and {STATUS_META.assumption_applied.label.toLowerCase()} amounts
           are benchmarks: confirm them before submitting.
         </p>
+        {awaitingPrice > 0 && (
+          <p className="small warn-note">
+            {awaitingPrice} supplier-quote positions have no material price yet and add only their labour to this total.
+          </p>
+        )}
       </section>
 
       <section className="card wide">
