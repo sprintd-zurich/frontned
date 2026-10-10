@@ -1924,7 +1924,8 @@ body.resizing img {
 .mail-body {
   width: 100%;
   margin-top: 8px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: inherit;
+  font-variant-numeric: tabular-nums;
   font-size: 11px;
   line-height: 1.5;
   resize: vertical;
@@ -4118,7 +4119,8 @@ body.resizing img {
 }
 
 .lv-id-badge {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-family: inherit;
+  font-variant-numeric: tabular-nums;
   font-weight: 700;
   color: #0284c7;
   font-size: 11px;
@@ -4143,7 +4145,8 @@ body.resizing img {
 }
 
 .quantity-val {
-  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-family: inherit;
+  font-variant-numeric: tabular-nums;
   font-weight: 700;
   color: #059669;
   font-size: 11.5px;
@@ -4339,7 +4342,8 @@ body.resizing img {
 }
 
 .prod-id-code {
-  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-family: inherit;
+  font-variant-numeric: tabular-nums;
   font-weight: 700;
   color: #0284c7;
   font-size: 11px;
@@ -4374,7 +4378,8 @@ body.resizing img {
 }
 
 .net-cost-val {
-  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-family: inherit;
+  font-variant-numeric: tabular-nums;
   font-weight: 700;
   color: #047857;
   font-size: 11px;
@@ -4382,7 +4387,8 @@ body.resizing img {
 }
 
 .rule-code-badge {
-  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-family: inherit;
+  font-variant-numeric: tabular-nums;
   font-size: 10px;
   font-weight: 600;
   color: #b45309;
@@ -4756,7 +4762,8 @@ body.resizing img {
 }
 
 .mono-cost {
-  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-family: inherit;
+  font-variant-numeric: tabular-nums;
   font-size: 11px;
   color: #334155;
 }
@@ -4830,7 +4837,8 @@ body.resizing img {
 }
 
 .formula-box code {
-  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-family: inherit;
+  font-variant-numeric: tabular-nums;
   font-size: 11px;
   color: #0f172a;
   background: rgba(0, 0, 0, 0.04);
@@ -4845,7 +4853,8 @@ body.resizing img {
   align-items: center;
   gap: 8px;
   font-size: 11px;
-  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-family: inherit;
+  font-variant-numeric: tabular-nums;
   margin-top: 4px;
   flex-wrap: wrap;
 }
@@ -4878,7 +4887,8 @@ body.resizing img {
 .cost-split-item strong {
   font-size: 13px;
   color: #0f172a;
-  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-family: inherit;
+  font-variant-numeric: tabular-nums;
 }
 
 .cost-split-item.total small {
@@ -4952,7 +4962,8 @@ body.resizing img {
 .wf-bar.slate { background: #64748b; }
 
 .wf-val {
-  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-family: inherit;
+  font-variant-numeric: tabular-nums;
   font-weight: 700;
   color: #0f172a;
   min-width: 110px;
@@ -5666,4 +5677,84 @@ body.resizing img {
 }
 .project-tabs button {
   padding: 5px 7px;
+}
+
+/* one font everywhere (Reazul): code, ids and numbers use the app font too, with even-width digits */
+code,
+kbd,
+pre,
+samp,
+input,
+select,
+textarea,
+button {
+  font-family: Arial, Helvetica, sans-serif;
+}
+code,
+kbd,
+samp {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Items, Product Matching, Calculation: the filter pills wrap, so the only horizontal scrollbar is the table's own at the bottom */
+.category-pills-row {
+  flex-wrap: wrap;
+  overflow-x: visible;
+  padding-bottom: 0;
+}
+
+/* Product Matching: prices from supplier product lists */
+.product-list-action {
+  margin-left: auto;
+  margin-right: 12px;
+}
+.list-offers .list-offer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 0;
+  border-top: 1px solid #edf1f6;
+  font-size: 12px;
+}
+.list-offers .list-offer:first-of-type {
+  border-top: 0;
+}
+.list-offer > span:first-child {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+.list-offer small,
+.list-offer a {
+  color: #64748b;
+  font-size: 11px;
+}
+.list-offer.current strong {
+  color: #475569;
+}
+.list-offer.used {
+  background: #f0faf6;
+  border-radius: 8px;
+  padding-left: 8px;
+  padding-right: 8px;
+}
+.list-offer-price {
+  display: grid;
+  justify-items: end;
+  white-space: nowrap;
+}
+.list-offer-price .cheaper {
+  color: #00987a;
+}
+.list-offer-price .dearer {
+  color: #d92d3f;
+}
+.list-offer-used {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #00987a;
+  font-weight: 600;
+  white-space: nowrap;
 }

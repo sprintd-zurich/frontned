@@ -70,6 +70,8 @@ export interface Position {
   /** Placeholder material cost for positions with no price; never folded into material_cost_chf. */
   estimated_material_chf: number | null
   estimated_material_basis: string | null
+  /** prices for this position from uploaded product lists that differ from the current price or supplier */
+  offers: ListOffer[]
 }
 
 export type TraceField =
@@ -666,4 +668,20 @@ export interface Validation {
     scenarios_match: boolean
     passed: boolean
   }
+}
+
+/** A row of a supplier product list that matches a position which already has a price. */
+export interface ListOffer {
+  lv_id: string
+  supplier: string
+  price_chf: number
+  description: string
+  article: string
+  /** where in the file: "row 12" or "page 2" */
+  where: string
+  score: number
+  current_chf: number | null
+  current_supplier: string | null
+  sheet: string
+  sheet_name: string
 }

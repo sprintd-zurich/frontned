@@ -20,6 +20,7 @@ import { useEstimate, useStore } from '../store'
 import type { CatalogItem, Position, Status } from '../types'
 import { Button, StatusBadge } from '../components/ui'
 import { SourceView } from '../components/SourceView'
+import { AddProductList, ListOffers } from '../components/ListOffers'
 
 const CATEGORY_COLORS: Record<string, { bg: string; text: string; border: string }> = {
   'Air terminal': { bg: '#e0f2fe', text: '#0369a1', border: '#bae6fd' },
@@ -251,6 +252,9 @@ function MatchedItemsContent() {
     <div className="matched-items-page">
       <div className="slide15-header-card product-matching-header">
         <h1 className="slide15-title">Product Matching</h1>
+        <span className="product-list-action">
+          <AddProductList />
+        </span>
         <label className="active-dataset-control">
           <Database size={17} />
           <span>
@@ -300,7 +304,7 @@ function MatchedItemsContent() {
           </div>
 
           {/* Pricing Route & Review Filter Pills */}
-          <div className="filter-pills" style={{ marginBottom: '8px', overflowX: 'auto', paddingBottom: '3px' }}>
+          <div className="filter-pills" style={{ marginBottom: '8px', flexWrap: 'wrap' }}>
             {routeOptions.map(([val, label]) => (
               <button
                 key={val}
@@ -634,6 +638,8 @@ function MatchedItemsContent() {
                     </div>
                   )}
                 </div>
+
+                <ListOffers p={activePosition} />
 
                 {/* Card 3: Pricing Route Control */}
                 <div className="inspector-section-card">

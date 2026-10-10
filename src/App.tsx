@@ -29,7 +29,7 @@ const WORK = [
 export default function App() {
   const loc = useLocation()
   const navigate = useNavigate()
-  const { estimate, ready, init, search, filter, toast, notify, error, busy } = useStore()
+  const { estimate, ready, init, search, filter, toast, notify, error, busy, askDetails } = useStore()
   const [modal, setModal] = useState<'' | 'help' | 'profile'>('')
   const page = loc.pathname
   const overview = page === '/' || !estimate
@@ -156,6 +156,11 @@ export default function App() {
           >
             {estimate ? 'Open Product Matching' : 'Import a tender'} <ArrowRight size={16} />
           </Button>
+        </Modal>
+      )}
+      {askDetails && estimate && (
+        <Modal title="Project details" close={() => useStore.setState({ askDetails: false })}>
+          <MetaForm onDone={() => useStore.setState({ askDetails: false })} />
         </Modal>
       )}
       {modal === 'profile' && (

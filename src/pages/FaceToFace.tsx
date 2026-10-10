@@ -15,7 +15,9 @@ type PricedInfo = Awaited<ReturnType<typeof api.pricedLvInfo>>
 export function FaceToFace({ priced = false }: { priced?: boolean }) {
   const e = useEstimate()
   const { selected, select, filter } = useStore()
-  const filtered = useFiltered()
+  // the priced view on Export lists every item, without filters (Reazul)
+  const all = useFiltered()
+  const filtered = priced ? e.positions : all
   const [info, setInfo] = useState<PricedInfo | null>(null)
   const [failed, setFailed] = useState('')
   useEffect(() => {
@@ -48,7 +50,7 @@ export function FaceToFace({ priced = false }: { priced?: boolean }) {
               <span className="subtitle">{rows.length} items</span>
             </div>
           </div>
-          <Filters />
+          {!priced && <Filters />}
           <PositionTable rows={rows} mode={priced ? 'calculation' : 'positions'} limit={50} />
         </section>
       }

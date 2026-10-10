@@ -28,6 +28,8 @@ interface State extends Filters {
   error: string | null
   toast: string
   ready: boolean
+  /** set after a new tender is imported, so the project details pop-up opens */
+  askDetails: boolean
   filter: (f: Partial<Filters>) => void
   clearFilters: () => void
   select: (lvId: string | null) => void
@@ -119,6 +121,7 @@ export const useStore = create<State>((set, get) => {
     error: null,
     toast: '',
     ready: false,
+    askDetails: false,
     ratio: savedRatio(),
     setRatio: (r) => {
       const ratio = Math.min(0.8, Math.max(0.2, r))
@@ -165,13 +168,17 @@ export const useStore = create<State>((set, get) => {
     },
     loadDemo: async () => {
       set({ ...NO_FILTERS, selected: null })
-      if (await run('Reading the tender and pricing every position…', api.loadDemo, 'Tender imported and priced.'))
+      if (await run('Reading the tender and pricing every position…', api.loadDemo, 'Tender imported and priced.')) {
+        set({ askDetails: true })
         get().refreshTenders()
+      }
     },
     upload: async (f) => {
       set({ ...NO_FILTERS, selected: null })
-      if (await run(`Reading ${f.name} and pricing every position…`, () => api.upload(f), 'Tender imported and priced.'))
+      if (await run(`Reading ${f.name} and pricing every position…`, () => api.upload(f), 'Tender imported and priced.')) {
+        set({ askDetails: true })
         get().refreshTenders()
+      }
     },
     close: () => {
       set({ estimate: null, selected: null, ...NO_FILTERS })
