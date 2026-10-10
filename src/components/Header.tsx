@@ -2,7 +2,7 @@ import type { Estimate } from '../types'
 import { fmtChf } from '../format'
 import { api } from '../api'
 
-export type Tab = 'positions' | 'buildup' | 'bid' | 'rfq'
+export type Tab = 'positions' | 'buildup' | 'checks' | 'bid' | 'rfq'
 
 interface Props {
   estimate: Estimate
@@ -21,6 +21,7 @@ export function Header({ estimate, tab, onTab, busy, onHome }: Props) {
   const attention = priceable.filter(
     (p) => !p.reviewed && ['review_required', 'insufficient_information'].includes(p.status),
   ).length
+  const warnings = estimate.checks.filter((c) => c.level === 'warning').length
   const pct = (n: number) => `${Math.round((100 * n) / Math.max(priceable.length, 1))}%`
 
   return (
@@ -39,6 +40,10 @@ export function Header({ estimate, tab, onTab, busy, onHome }: Props) {
           </button>
           <button className={tab === 'buildup' ? 'active' : ''} onClick={() => onTab('buildup')}>
             Price build-up
+          </button>
+          <button className={tab === 'checks' ? 'active' : ''} onClick={() => onTab('checks')}>
+            Checks
+            {warnings > 0 && <span className="tab-badge">{warnings}</span>}
           </button>
           <button className={tab === 'bid' ? 'active' : ''} onClick={() => onTab('bid')}>
             Bid decision

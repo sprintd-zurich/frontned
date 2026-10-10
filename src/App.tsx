@@ -7,6 +7,7 @@ import { PositionsView } from './components/PositionsView'
 import { BuildUpView } from './components/BuildUpView'
 import { BidView } from './components/BidView'
 import { RfqView } from './components/RfqView'
+import { ChecksView } from './components/ChecksView'
 
 export default function App() {
   const [estimate, setEstimate] = useState<Estimate | null>(null)
@@ -14,6 +15,7 @@ export default function App() {
   const [tab, setTab] = useState<Tab>('positions')
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [only, setOnly] = useState<{ label: string; ids: string[] } | null>(null)
 
   const run = useCallback(async (label: string, fn: () => Promise<Estimate>) => {
     setBusy(label)
@@ -67,7 +69,18 @@ export default function App() {
         }}
       />
       {error && <div className="banner error">{error}</div>}
-      {tab === 'positions' && <PositionsView estimate={estimate} catalog={catalog} onOverride={override} />}
+      {tab === 'positions' && (
+        <PositionsView estimate={estimate} catalog={catalog} onOverride={override} only={only} onClearOnly={() => setOnly(null)} />
+      )}
+      {tab === 'checks' && (
+        <ChecksView
+          estimate={estimate}
+          onShow={(label, ids) => {
+            setOnly({ label, ids })
+            setTab('positions')
+          }}
+        />
+      )}
       {tab === 'buildup' && <BuildUpView estimate={estimate} onParams={setParams} />}
       {tab === 'rfq' && <RfqView estimate={estimate} />}
       {tab === 'bid' && (
