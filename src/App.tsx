@@ -2,11 +2,10 @@ import { useCallback, useEffect, useState } from 'react'
 import { api } from './api'
 import type { CatalogItem, Estimate, Parameters, PositionOverride } from './types'
 import { Landing } from './components/Landing'
-import { Header } from './components/Header'
+import { Header, type Tab } from './components/Header'
 import { PositionsView } from './components/PositionsView'
 import { BuildUpView } from './components/BuildUpView'
-
-type Tab = 'positions' | 'buildup'
+import { BidView } from './components/BidView'
 
 export default function App() {
   const [estimate, setEstimate] = useState<Estimate | null>(null)
@@ -67,10 +66,16 @@ export default function App() {
         }}
       />
       {error && <div className="banner error">{error}</div>}
-      {tab === 'positions' ? (
-        <PositionsView estimate={estimate} catalog={catalog} onOverride={override} />
-      ) : (
-        <BuildUpView estimate={estimate} onParams={setParams} />
+      {tab === 'positions' && <PositionsView estimate={estimate} catalog={catalog} onOverride={override} />}
+      {tab === 'buildup' && <BuildUpView estimate={estimate} onParams={setParams} />}
+      {tab === 'bid' && (
+        <BidView
+          estimate={estimate}
+          onParams={setParams}
+          onSave={(name) => run('Saving scenario…', () => api.saveSnapshot(estimate.tender.id, name))}
+          onApply={(sid) => run('Restoring scenario…', () => api.applySnapshot(estimate.tender.id, sid))}
+          onDelete={(sid) => run('Removing scenario…', () => api.deleteSnapshot(estimate.tender.id, sid))}
+        />
       )}
     </div>
   )
