@@ -5793,3 +5793,38 @@ samp {
   text-transform: uppercase;
   letter-spacing: 0.03em;
 }
+
+/* Experience: Opinion / Estimate / File switch, one compact row */
+.experience-form .segmented {
+  display: flex;
+  flex: none;
+  align-items: center;
+  height: auto;
+  gap: 4px;
+  padding: 3px;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  overflow: visible;
+}
+.experience-form .segmented button {
+  flex: 1 1 0;
+  align-self: center;
+  height: 34px;
+  max-height: 34px;
+  min-height: 0;
+  padding: 0 10px;
+  font-size: 13px;
+  color: #334155;
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  box-shadow: none;
+}
+.experience-form .segmented button.active {
+  background: #08266a;
+  color: #fff;
+}
+.experience-form {
+  align-content: start;
+}
