@@ -16,6 +16,7 @@ import {
   MapPin,
   MessageSquare,
   Plus,
+  RotateCcw,
   Search,
   ShieldCheck,
   Trash2,
@@ -32,14 +33,18 @@ import { MetaForm } from './MetaForm'
 import { Workflow } from '../components/Shell'
 
 export function ProjectsSidebar() {
-  const { tenders, estimate, open, removeTender, busy } = useStore()
+  const { tenders, estimate, open, removeTender, archiveTender, busy } = useStore()
   const [q, setQ] = useState('')
-  const [tab, setTab] = useState<'All' | 'In review' | 'New'>('All')
+  const [tab, setTab] = useState<'All' | 'In review' | 'New' | 'Archived'>('All')
   const [importing, setImporting] = useState(false)
   const [confirm, setConfirm] = useState<string | null>(null)
   const navigate = useNavigate()
+  // archived tenders only show under Archived, until they are restored or deleted permanently from there
   const inTab = (t: (typeof tenders)[number], name: string) =>
-    name === 'All' || (name === 'In review' ? t.reviewed > 0 : t.reviewed === 0)
+    name === 'Archived'
+      ? t.archived
+      : !t.archived && (name === 'All' || (name === 'In review' ? t.reviewed > 0 : t.reviewed === 0))
+  const active = tenders.filter((t) => !t.archived)
   const shown = tenders.filter(
     (t) => `${t.meta.project_name} ${t.name} ${t.meta.location}`.toLowerCase().includes(q.toLowerCase()) && inTab(t, tab),
   )
@@ -56,7 +61,7 @@ export function ProjectsSidebar() {
         <input placeholder="Search tenders…" aria-label="Search tenders" value={q} onChange={(e) => setQ(e.target.value)} />
       </label>
       <div className="project-tabs">
-        {(['All', 'In review', 'New'] as const).map((t) => (
+        {(['All', 'In review', 'New', 'Archived'] as const).map((t) => (
           <button key={t} className={tab === t ? 'active' : ''} onClick={() => setTab(t)}>
             {t} <small>{tenders.filter((x) => inTab(x, t)).length}</small>
           </button>
@@ -83,21 +88,32 @@ export function ProjectsSidebar() {
               </span>
               <i style={{ background: estimate?.tender.id === t.id ? '#1389ff' : t.reviewed ? '#00987a' : '#ff8b38' }} />
             </button>
-            <button className="project-remove" aria-label={`Remove ${t.name}`} title="Remove tender" onClick={() => setConfirm(t.id)}>
-              <Trash2 size={14} />
-            </button>
+            {t.archived ? (
+              <span className="project-archived-actions">
+                <button className="project-remove" aria-label={`Restore ${t.name}`} title="Restore tender" onClick={() => archiveTender(t.id, false)}>
+                  <RotateCcw size={14} />
+                </button>
+                <button className="project-remove" aria-label={`Delete ${t.name} permanently`} title="Delete permanently" onClick={() => setConfirm(t.id)}>
+                  <Trash2 size={14} />
+                </button>
+              </span>
+            ) : (
+              <button className="project-remove" aria-label={`Archive ${t.name}`} title="Move to Archived" onClick={() => archiveTender(t.id, true)}>
+                <Trash2 size={14} />
+              </button>
+            )}
           </div>
         ))}
-        {!shown.length && <p className="muted portfolio-empty">{tenders.length ? 'No tender matches.' : 'No tender imported yet.'}</p>}
+        {!shown.length && <p className="muted portfolio-empty">{tab === 'Archived' ? 'No archived tender.' : active.length ? 'No tender matches.' : 'No tender imported yet.'}</p>}
       </div>
-      <span className="portfolio-note">Stored on the pricing server · {tenders.length} tenders</span>
+      <span className="portfolio-note">Stored on the pricing server · {active.length} tenders{tenders.length > active.length ? ` · ${tenders.length - active.length} archived` : ''}</span>
       {importing && (
         <Modal title="Import a tender" close={() => setImporting(false)}>
           <ImportPanel onDone={() => setImporting(false)} />
         </Modal>
       )}
       {confirm && (
-        <Modal title="Remove this tender?" close={() => setConfirm(null)}>
+        <Modal title="Delete this tender permanently?" close={() => setConfirm(null)}>
           <p>The tender, its estimate, notes and scenarios are deleted from the pricing server. This cannot be undone.</p>
           <div className="modal-actions">
             <Button onClick={() => setConfirm(null)}>Cancel</Button>
@@ -109,7 +125,7 @@ export function ProjectsSidebar() {
                 await removeTender(id)
               }}
             >
-              <Trash2 size={15} /> Remove
+              <Trash2 size={15} /> Delete permanently
             </Button>
           </div>
         </Modal>

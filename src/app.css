@@ -5644,3 +5644,26 @@ body.resizing img {
     scrollbar-width: none;
   }
 }
+
+/* archived tenders: restore or delete permanently, always visible */
+.project-archived-actions {
+  position: absolute;
+  right: 6px;
+  top: 8px;
+  display: flex;
+  gap: 2px;
+}
+.project-archived-actions .project-remove {
+  position: static;
+  opacity: 1;
+}
+.project-archived-actions .project-remove:first-child:hover {
+  color: #0785ff;
+  background: #e8f3ff;
+}
+.project-tabs {
+  gap: 4px;
+}
+.project-tabs button {
+  padding: 5px 7px;
+}

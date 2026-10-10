@@ -39,6 +39,7 @@ interface State extends Filters {
   upload: (f: File) => Promise<void>
   close: () => void
   removeTender: (id: string) => Promise<void>
+  archiveTender: (id: string, archived: boolean) => Promise<void>
   override: (lvId: string, body: PositionOverride, done?: string) => Promise<void>
   bulk: (lvIds: string[], body: { reviewed?: boolean; status?: Status }, done?: string) => Promise<void>
   setMaterialInflation: (b: MaterialInflation) => Promise<void>
@@ -180,8 +181,21 @@ export const useStore = create<State>((set, get) => {
       try {
         await api.remove(id)
         if (get().estimate?.tender.id === id) get().close()
-        await get().refreshTenders()
-        set({ toast: 'Tender removed.' })
+        set({ tenders: get().tenders.filter((t) => t.id !== id) })
+        get().refreshTenders()
+        set({ toast: 'Tender deleted permanently.' })
+      } catch (err) {
+        set({ error: (err as Error).message })
+      }
+    },
+    archiveTender: async (id, archived) => {
+      try {
+        await api.archive(id, archived)
+        if (archived && get().estimate?.tender.id === id) get().close()
+        // the list moves at once; the full refresh can take a moment with many tenders
+        set({ tenders: get().tenders.map((t) => (t.id === id ? { ...t, archived } : t)) })
+        get().refreshTenders()
+        set({ toast: archived ? 'Tender moved to Archived.' : 'Tender restored.' })
       } catch (err) {
         set({ error: (err as Error).message })
       }
