@@ -1204,81 +1204,9 @@ tr.approved-row td:nth-child(2) {
   }
 }
 
-/* ---------- one-column workspace: progress, floating system strip, work area ---------- */
+/* ---------- one-column workspace: progress, category strip, work area ---------- */
 .app.workspace-shell {
   grid-template-columns: minmax(0, 1fr);
-}
-.system-strip {
-  position: sticky;
-  top: 72px;
-  z-index: 20;
-  display: flex;
-  gap: 8px;
-  overflow-x: auto;
-  padding: 2px 2px 6px;
-  scrollbar-width: thin;
-}
-.system-chip {
-  flex: 1 0 auto;
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  padding: 8px 10px 8px 8px;
-  border: 1px solid #e3e9f2;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.96);
-  box-shadow: 0 6px 18px #0b2a5a14;
-  backdrop-filter: blur(6px);
-  text-align: left;
-  transition: border-color 0.15s, transform 0.15s, box-shadow 0.15s;
-}
-.system-chip:hover {
-  border-color: var(--system-color, var(--blue));
-  transform: translateY(-1px);
-  box-shadow: 0 9px 22px #0b2a5a1f;
-}
-.system-chip.selected {
-  border-color: var(--system-color, #062969);
-  background: linear-gradient(100deg, #fff, #f3f7ff);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--system-color, #062969) 25%, transparent), 0 9px 22px #0b2a5a1f;
-}
-.chip-dot {
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  flex-shrink: 0;
-  background: conic-gradient(var(--system-color) var(--value, 0deg), color-mix(in srgb, var(--system-color) 22%, #fff) 0);
-  -webkit-mask: radial-gradient(circle, transparent 9px, #000 10px);
-  mask: radial-gradient(circle, transparent 9px, #000 10px);
-}
-.system-chip.all .chip-dot {
-  background: #062969;
-  color: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  -webkit-mask: none;
-  mask: none;
-}
-.chip-body {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-  flex: 1;
-}
-.chip-body strong {
-  font-size: 12px;
-  white-space: nowrap;
-}
-.chip-body small {
-  font-size: 10px;
-  color: #6f84a3;
-  white-space: nowrap;
-}
-.system-chip > b {
-  font-size: 14px;
-  color: var(--system-color, #062969);
 }
 
 /* ---------- progress steps as icon circles ---------- */
@@ -1336,9 +1264,6 @@ tr.approved-row td:nth-child(2) {
   }
 }
 @media (max-width: 800px) {
-  .system-strip {
-    position: static;
-  }
   .step-circle {
     width: 42px;
     height: 42px;
@@ -1431,4 +1356,350 @@ tr.approved-row td:nth-child(2) {
   .face-layout .face-document .document-viewport {
     max-height: 70vh;
   }
+}
+
+/* ---------- top navigation: Projects | work steps ---------- */
+.topbar .nav-split {
+  width: 1px;
+  align-self: center;
+  height: 26px;
+  background: #cfd8e5;
+  margin: 0 -8px;
+}
+
+/* ---------- HVAC category strip (fixed under the project progress) ---------- */
+.category-strip {
+  display: flex;
+  gap: 7px;
+  overflow-x: auto;
+  padding: 1px 1px 3px;
+  scrollbar-width: thin;
+}
+.category-chip {
+  --cat: #062969;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: color-mix(in srgb, var(--cat) 80%, #08245b);
+  background: color-mix(in srgb, var(--cat) 10%, #fff);
+  border: 1px solid color-mix(in srgb, var(--cat) 22%, #fff);
+  transition: background 0.15s, border-color 0.15s;
+}
+.category-chip span {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--cat) 16%, #fff);
+}
+.category-chip:hover:not(:disabled) {
+  border-color: var(--cat);
+}
+.category-chip.selected {
+  background: var(--cat);
+  border-color: var(--cat);
+  color: #fff;
+}
+.category-chip.selected span {
+  background: #ffffff33;
+}
+.category-chip:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.category-chip.all {
+  --cat: #062969;
+}
+.category-tag {
+  --cat: #062969;
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+  color: color-mix(in srgb, var(--cat) 80%, #08245b);
+  background: color-mix(in srgb, var(--cat) 12%, #fff);
+}
+
+/* ---------- positions table: what was read from the tender ---------- */
+.reading-table td.system-cell {
+  white-space: nowrap;
+  font-size: 11px;
+}
+.reading-table td.system-cell small {
+  display: block;
+  max-width: 130px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pos-cell .edited-tag {
+  display: block;
+  width: max-content;
+  margin: 3px 0 0;
+}
+
+/* ---------- traceable numbers ---------- */
+.traced {
+  position: relative;
+  display: inline-block;
+}
+.traced-value {
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-decoration: underline dotted #8ea3c2;
+  text-underline-offset: 3px;
+  cursor: help;
+}
+.traced-value:hover {
+  text-decoration-color: #0785ff;
+  color: #0560c8;
+}
+.trace-pop {
+  position: fixed;
+  z-index: 60;
+  width: max-content;
+  max-width: min(380px, 80vw);
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  background: #072a58;
+  color: #fff;
+  border-radius: 9px;
+  box-shadow: 0 10px 26px #072a5840;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.4;
+  text-align: left;
+  white-space: normal;
+}
+.trace-pop strong {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 12px;
+}
+.source-line {
+  display: block;
+  margin-top: 4px;
+}
+.source-line .traced-value {
+  font-size: 10px;
+  color: #5b7395;
+  text-decoration: none;
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+}
+.source-line .traced-value:hover {
+  color: #0560c8;
+  text-decoration: underline;
+}
+
+/* ---------- review: proposal from company data / position to review ---------- */
+.proposal-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: flex-start;
+  border-radius: 10px;
+  padding: 11px 13px;
+  margin: 10px 0 14px;
+}
+.proposal-head > span {
+  display: grid;
+  gap: 2px;
+  flex: 1;
+  min-width: 180px;
+}
+.proposal-head strong {
+  font-size: 13px;
+}
+.proposal-head small {
+  font-size: 11px;
+}
+.proposal-head.ok {
+  background: #e9f7f2;
+  color: #0a6b53;
+}
+.proposal-head.todo {
+  background: #fff3e8;
+  color: #9a4b0b;
+}
+.review-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  width: 100%;
+  padding-left: 28px;
+}
+.notes-history .notes-input {
+  margin-top: 14px;
+}
+.detail-panel h2 .edited-tag {
+  font-size: 10px;
+  vertical-align: 3px;
+}
+
+/* ---------- separate scrolling of the two sides ---------- */
+@media (min-width: 1101px) {
+  .app.workspace-shell:has(> .workspace-main.split) {
+    height: calc(100vh - 65px);
+    grid-template-rows: auto auto minmax(0, 1fr);
+    padding-bottom: 38px;
+  }
+  .workspace-main.split {
+    min-height: 0;
+  }
+  .workspace-main.split > .face-layout,
+  .workspace-main.split > .workspace.review {
+    height: 100%;
+  }
+  .workspace-main.split > .face-layout {
+    align-items: stretch;
+  }
+  .workspace-main.split > .face-layout > .card {
+    min-height: 0;
+    overflow: auto;
+  }
+  .workspace-main.split > .face-layout .face-document {
+    position: static;
+    display: flex;
+    flex-direction: column;
+  }
+  .workspace-main.split > .face-layout .face-document .source-view {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .workspace-main.split > .face-layout .face-document .document-viewport {
+    flex: 1;
+    max-height: none;
+  }
+  .workspace-main.split > .workspace.review {
+    grid-template-rows: auto minmax(0, 1fr);
+    align-items: stretch;
+  }
+  .workspace-main.split > .workspace.review > .positions-list,
+  .workspace-main.split > .workspace.review > .detail-panel {
+    overflow: auto;
+    min-height: 0;
+  }
+}
+
+/* ---------- bid: systems and calculated price on top, details side by side ---------- */
+.bid-cost,
+.bid-bottom {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+.bid-bottom .param-grid.two {
+  grid-template-columns: minmax(0, 1fr);
+}
+.system-rows {
+  display: grid;
+  gap: 4px;
+  margin-top: 6px;
+}
+.system-row {
+  --system-color: #0785ff;
+  display: grid;
+  grid-template-columns: minmax(150px, 1.3fr) minmax(60px, 1fr) auto auto 15px;
+  gap: 12px;
+  align-items: center;
+  padding: 9px 8px;
+  border-radius: 8px;
+  text-align: left;
+  font-size: 12px;
+}
+.system-row:hover {
+  background: #f4f8fd;
+}
+.system-name {
+  display: grid;
+  grid-template-columns: 9px 1fr;
+  column-gap: 8px;
+  min-width: 0;
+}
+.system-name i {
+  grid-row: span 2;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  margin-top: 4px;
+  background: var(--system-color);
+}
+.system-name strong,
+.system-name small {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.system-name small {
+  color: #6f84a3;
+  font-size: 10px;
+}
+.system-bar {
+  height: 7px;
+  border-radius: 6px;
+  background: #edf1f7;
+  overflow: hidden;
+}
+.system-bar span {
+  display: block;
+  height: 100%;
+  border-radius: 6px;
+  background: var(--system-color);
+}
+.system-row small.muted {
+  font-size: 10px;
+  white-space: nowrap;
+}
+.calculated-price .buildup-table {
+  margin-top: 10px;
+}
+.calculated-price .param-grid {
+  margin-top: 16px;
+}
+
+/* ---------- calendar: days until the submission ---------- */
+.calendar-grid .countdown {
+  background: #ffe3e6;
+  color: #a11a2f;
+  border-radius: 0;
+}
+.calendar-grid .countdown.today {
+  border-radius: 30px;
+}
+.calendar-legend i.light-red {
+  background: #ffd3d9;
+}
+
+@media (max-width: 1100px) {
+  .bid-cost,
+  .bid-bottom {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 640px) {
+  .system-row {
+    grid-template-columns: minmax(0, 1fr) auto 15px;
+  }
+  .system-row .system-bar,
+  .system-row small.muted {
+    display: none;
+  }
+}
+.face-layout .position-table.reading-table td {
+  height: auto;
+  padding: 10px 7px;
 }

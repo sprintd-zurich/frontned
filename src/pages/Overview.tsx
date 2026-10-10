@@ -217,7 +217,7 @@ function Dashboard() {
   const m = metrics(e.positions)
   const meta = e.tender.meta
   const systems = systemsOf(e.positions)
-  const tabs = ['Dashboard', 'Positions', 'Review', 'Systems', 'Bid', 'Export', 'Details']
+  const tabs = ['Dashboard', 'Positions', 'Review', 'Bid', 'Export', 'Details']
   const ready = m.open === 0
   return (
     <>
@@ -395,7 +395,7 @@ function Dashboard() {
 
 export function ActivityItem({ a }: { a: Activity }) {
   const estimator = useStore((s) => s.estimate?.tender.meta.estimator)
-  const who = a.kind === 'import' ? 'AI' : a.kind === 'export' ? 'EX' : initials(estimator)
+  const who = a.kind === 'import' ? 'LV' : a.kind === 'export' ? 'EX' : initials(estimator)
   return (
     <div className="activity-item">
       <span className={`avatar tiny ${a.kind}`}>{who}</span>
@@ -499,14 +499,12 @@ function Calendar() {
         {Array.from({ length: days }, (_, i) => i + 1).map((d) => {
           const day = new Date(year, month, d)
           const ev = events.get(key(day)) ?? []
-          const cls =
-            key(day) === key(today)
-              ? 'today'
-              : submission && key(day) === key(submission)
-                ? 'deadline'
-                : ev.length
-                  ? 'busy-day'
-                  : ''
+          // the days left between today and the submission deadline are tinted light red
+          const left = !!submission && day > today && day < submission && key(day) !== key(submission)
+          const cls = [
+            key(day) === key(today) ? 'today' : submission && key(day) === key(submission) ? 'deadline' : ev.length ? 'busy-day' : '',
+            left ? 'countdown' : '',
+          ].join(' ')
           return (
             <button
               key={d}
@@ -528,6 +526,12 @@ function Calendar() {
           <i className="red" />
           Submission
         </span>
+        {submission && (
+          <span>
+            <i className="light-red" />
+            Days left
+          </span>
+        )}
         <span>
           <i className="peach" />
           Tender activity

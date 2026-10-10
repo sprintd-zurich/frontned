@@ -1,12 +1,14 @@
 import { create } from 'zustand'
 import { api, type ProductivityRule } from './api'
 import type { Pill } from './derive'
-import type { CatalogItem, Estimate, Meta, Parameters, PositionOverride, Status, TenderSummary } from './types'
+import type { CatalogItem, Estimate, Meta, Parameters, PositionOverride, TenderSummary } from './types'
 
 const LAST = 'equans-tender-id'
 
 interface Filters {
   system: string
+  /** HVAC trade from the category strip */
+  category: string
   pill: Pill
   search: string
   section: string
@@ -25,8 +27,6 @@ interface State extends Filters {
   error: string | null
   toast: string
   ready: boolean
-  /** Calculation page: the position table or the project build-up. */
-  calcView: 'positions' | 'buildup'
   filter: (f: Partial<Filters>) => void
   clearFilters: () => void
   select: (lvId: string | null) => void
@@ -39,7 +39,6 @@ interface State extends Filters {
   close: () => void
   removeTender: (id: string) => Promise<void>
   override: (lvId: string, body: PositionOverride, done?: string) => Promise<void>
-  bulk: (lvIds: string[], body: { reviewed?: boolean; status?: Status }, done?: string) => Promise<void>
   addNote: (lvId: string, text: string) => Promise<void>
   deleteNote: (lvId: string, nid: string) => Promise<void>
   setParams: (b: Partial<Parameters>) => Promise<void>
@@ -49,7 +48,7 @@ interface State extends Filters {
   deleteSnapshot: (sid: string) => Promise<void>
 }
 
-const NO_FILTERS: Filters = { system: 'all', pill: 'all', search: '', section: 'all', hideDucts: false, only: null }
+const NO_FILTERS: Filters = { system: 'all', category: 'all', pill: 'all', search: '', section: 'all', hideDucts: false, only: null }
 
 function remember(id: string | null) {
   try {
@@ -98,7 +97,6 @@ export const useStore = create<State>((set, get) => {
     error: null,
     toast: '',
     ready: false,
-    calcView: 'positions',
     filter: (f) => set(f),
     clearFilters: () => set(NO_FILTERS),
     select: (selected) => set({ selected }),
@@ -157,9 +155,6 @@ export const useStore = create<State>((set, get) => {
     },
     override: async (lvId, body, done) => {
       await run('Recalculating…', () => api.override(tid(), lvId, body), done)
-    },
-    bulk: async (lvIds, body, done) => {
-      await run('Updating positions…', () => api.bulk(tid(), { lv_ids: lvIds, ...body }), done)
     },
     addNote: async (lvId, text) => {
       await run('Saving note…', () => api.addNote(tid(), lvId, text, get().estimate?.tender.meta.estimator), 'Note saved.')

@@ -5,6 +5,7 @@ import { useEstimate, useStore } from '../store'
 import type { BidPoint, BidScenario, Parameters, Snapshot } from '../types'
 import { ParamGroup } from '../components/ParamGroup'
 import { Button, Empty } from '../components/ui'
+import { CalculatedPrice, SystemsSummary } from './BidCost'
 
 const TONE: Record<string, string> = { Aggressive: '#ff6a20', Target: '#0785ff', Conservative: '#009c7b' }
 
@@ -14,6 +15,10 @@ export function Bid() {
   const best = bid.scenarios.find((s) => s.scenario === bid.recommended)!
   return (
     <div className="bid-page">
+      <div className="bid-cost">
+        <SystemsSummary />
+        <CalculatedPrice />
+      </div>
       <section className="card bid-hero">
         <div>
           <span className="eyebrow">BID DECISION</span>
@@ -69,33 +74,35 @@ export function Bid() {
           <small className="muted">Peak on the curve at {bid.peak_margin_pct}% margin.</small>
         </section>
       </div>
-      <section className="card">
-        <h3>How the probability is estimated</h3>
-        <p className="formula">
-          win probability = base {pct(bid.inputs.reference_win_probability)} + strategic appetite{' '}
-          {signed(bid.inputs.strategic_appetite_adjustment)} + competition {signed(bid.inputs.competition_adjustment)} −{' '}
-          {Math.round(bid.inputs.price_sensitivity_probability_points_per_1pct_price * 100)} points for every 1% above the
-          reference price, kept between {pct(bid.limits.min_probability)} and {pct(bid.limits.max_probability)}.
-          <br />
-          bid price = cost baseline ÷ (1 − margin), rounded up to CHF 1’000 · expected contribution = win probability × (bid
-          price − cost baseline)
-        </p>
-        <div className="param-grid two">
-          <ParamGroup
-            title="Market and strategy (what-if)"
-            group="bid"
-            values={pick(bid.inputs, [
-              'reference_win_probability',
-              'price_sensitivity_probability_points_per_1pct_price',
-              'strategic_appetite_adjustment',
-              'competition_adjustment',
-            ])}
-            step={0.01}
-          />
-          <ParamGroup title="Scenario margins" group="bid" values={pick(bid.inputs, ['margin_Aggressive', 'margin_Target', 'margin_Conservative'])} step={0.5} />
-        </div>
-      </section>
-      <Scenarios />
+      <div className="bid-bottom">
+        <section className="card">
+          <h3>How the probability is estimated</h3>
+          <p className="formula">
+            win probability = base {pct(bid.inputs.reference_win_probability)} + strategic appetite{' '}
+            {signed(bid.inputs.strategic_appetite_adjustment)} + competition {signed(bid.inputs.competition_adjustment)} −{' '}
+            {Math.round(bid.inputs.price_sensitivity_probability_points_per_1pct_price * 100)} points for every 1% above the
+            reference price, kept between {pct(bid.limits.min_probability)} and {pct(bid.limits.max_probability)}.
+            <br />
+            bid price = cost baseline ÷ (1 − margin), rounded up to CHF 1’000 · expected contribution = win probability × (bid
+            price − cost baseline)
+          </p>
+          <div className="param-grid two">
+            <ParamGroup
+              title="Market and strategy (what-if)"
+              group="bid"
+              values={pick(bid.inputs, [
+                'reference_win_probability',
+                'price_sensitivity_probability_points_per_1pct_price',
+                'strategic_appetite_adjustment',
+                'competition_adjustment',
+              ])}
+              step={0.01}
+            />
+            <ParamGroup title="Scenario margins" group="bid" values={pick(bid.inputs, ['margin_Aggressive', 'margin_Target', 'margin_Conservative'])} step={0.5} />
+          </div>
+        </section>
+        <Scenarios />
+      </div>
     </div>
   )
 }
@@ -280,7 +287,7 @@ function Scenarios() {
         <div>
           <h3>Scenario comparison</h3>
           <p className="muted">
-            Save the current settings, change parameters here or under Review → Project build-up, save again and compare.
+            Save the current settings, change parameters here or under Calculated price → Project parameters, save again and compare.
             Position edits stay as they are when you restore a scenario.
           </p>
         </div>

@@ -4,20 +4,17 @@ import { AlertTriangle, ArrowRight, CheckCircle2, HelpCircle, Search, X } from '
 import { initials } from './derive'
 import { useStore } from './store'
 import { Button, Modal } from './components/ui'
-import { ProjectCard, SystemStrip, Workflow } from './components/Shell'
+import { CategoryStrip, ProjectCard, Workflow } from './components/Shell'
 import { Overview, ProjectsSidebar } from './pages/Overview'
 import { Workspace } from './pages/Workspace'
 import { FaceToFace } from './pages/FaceToFace'
-import { Systems } from './pages/Systems'
 import { Bid } from './pages/Bid'
 import { Export } from './pages/Export'
 import { MetaForm } from './pages/MetaForm'
 
-const NAV = [
-  ['/', 'Overview'],
+const WORK = [
   ['/positions', 'Positions'],
   ['/review', 'Review'],
-  ['/systems', 'Systems'],
   ['/bid', 'Bid'],
   ['/export', 'Export'],
 ] as const
@@ -45,17 +42,16 @@ export default function App() {
   return (
     <>
       <header className="topbar">
-        <NavLink to="/" className="brand" aria-label="EQUANS Overview">
+        <NavLink to="/" className="brand" aria-label="EQUANS projects">
           EQUANS
         </NavLink>
         <nav>
-          {NAV.map(([url, label]) => (
-            <NavLink
-              key={url}
-              to={url}
-              end={url === '/'}
-              className={({ isActive }) => (isActive ? 'active' : '')}
-            >
+          <NavLink to="/" end className={({ isActive }) => (isActive ? 'active' : '')}>
+            Projects
+          </NavLink>
+          <span className="nav-split" aria-hidden />
+          {WORK.map(([url, label]) => (
+            <NavLink key={url} to={url} className={({ isActive }) => (isActive ? 'active' : '')}>
               {label}
             </NavLink>
           ))}
@@ -69,7 +65,7 @@ export default function App() {
             disabled={!estimate}
             onChange={(e) => {
               filter({ search: e.target.value })
-              if (['/', '/systems', '/export', '/bid'].includes(page)) navigate('/positions')
+              if (['/', '/export', '/bid'].includes(page)) navigate('/positions')
             }}
           />
         </label>
@@ -98,14 +94,14 @@ export default function App() {
               <ProjectCard />
               <Workflow />
             </div>
-            <SystemStrip />
+            <CategoryStrip />
           </>
         )}
-        <main className={overview ? 'dashboard-main' : 'workspace-main'}>
+        <main className={overview ? 'dashboard-main' : `workspace-main ${['/bid', '/export'].includes(page) ? '' : 'split'}`}>
           {overview ? (
             ready || estimate ? <Overview /> : <div className="loading-state"><span className="spinner" /> Connecting to the pricing API…</div>
           ) : page === '/systems' ? (
-            <Systems />
+            <Navigate to="/bid" replace />
           ) : page === '/bid' ? (
             <Bid />
           ) : page === '/export' ? (
@@ -139,9 +135,9 @@ export default function App() {
         <Modal title="From tender to a first price you can defend" close={() => setModal('')}>
           <p>Import the tender PDF. Every step below works on the real extraction and prices.</p>
           <ol className="guide">
-            <li>Positions: every extracted LV line next to the tender page, with its source highlighted.</li>
-            <li>Review: decide the open positions, switch products, request quotes and approve; the calculation of each position and the project build-up live here too.</li>
-            <li>Bid: compare margins, win probability and saved scenarios.</li>
+            <li>Positions: every LV line as read from the tender, next to the tender page with its source highlighted.</li>
+            <li>Review: each position matched against the company database and its prices. Where data is missing, review it, add the information or request a supplier quote, then approve.</li>
+            <li>Bid: cost per system, the calculated price, then margins, win probability and saved scenarios.</li>
             <li>Export: the positions next to the priced tender PDF, the offer workbook and supplier RFQs.</li>
           </ol>
           <Button

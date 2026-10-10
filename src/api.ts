@@ -6,7 +6,6 @@ import type {
   PositionOverride,
   RfqPackage,
   SourceLocation,
-  Status,
   TenderSummary,
 } from './types'
 
@@ -50,8 +49,6 @@ export const api = {
   setMeta: (id: string, body: Partial<Meta>) => call<Estimate>(`/api/tenders/${id}/meta`, json('PATCH', body)),
   override: (id: string, lvId: string, body: PositionOverride) =>
     call<Estimate>(`/api/tenders/${id}/positions/${lvId}`, json('PATCH', body)),
-  bulk: (id: string, body: { lv_ids: string[]; reviewed?: boolean; status?: Status }) =>
-    call<Estimate>(`/api/tenders/${id}/positions/bulk`, json('POST', body)),
   addNote: (id: string, lvId: string, text: string, author?: string) =>
     call<Estimate>(`/api/tenders/${id}/positions/${lvId}/notes`, json('POST', { text, author })),
   deleteNote: (id: string, lvId: string, nid: string) =>
