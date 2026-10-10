@@ -11,34 +11,40 @@ import {
   ChevronRight,
   Clock3,
   Database,
+  Download,
   FileText,
   MapPin,
   MessageSquare,
   Plus,
+  RotateCcw,
   Search,
   ShieldCheck,
   Trash2,
   Upload,
   UserRound,
 } from 'lucide-react'
-import { initials, isBlocker, lastOf, metrics, needsDecision, positionLabel, systemsOf, workflow } from '../derive'
+import { initials, isBlocker, lastOf, metrics, workflow, type Pill } from '../derive'
 import { fmtChf, fmtDate, fmtWhen, money, parseDay } from '../format'
 import { api } from '../api'
 import { useEstimate, useStore } from '../store'
 import type { Activity } from '../types'
-import { Button, Modal, Progress, Ring } from '../components/ui'
+import { Button, Modal, Progress } from '../components/ui'
 import { MetaForm } from './MetaForm'
 import { Workflow } from '../components/Shell'
 
 export function ProjectsSidebar() {
-  const { tenders, estimate, open, removeTender, busy } = useStore()
+  const { tenders, estimate, open, removeTender, archiveTender, busy } = useStore()
   const [q, setQ] = useState('')
-  const [tab, setTab] = useState<'All' | 'In review' | 'New'>('All')
+  const [tab, setTab] = useState<'All' | 'In review' | 'New' | 'Archived'>('All')
   const [importing, setImporting] = useState(false)
   const [confirm, setConfirm] = useState<string | null>(null)
   const navigate = useNavigate()
+  // archived tenders only show under Archived, until they are restored or deleted permanently from there
   const inTab = (t: (typeof tenders)[number], name: string) =>
-    name === 'All' || (name === 'In review' ? t.reviewed > 0 : t.reviewed === 0)
+    name === 'Archived'
+      ? t.archived
+      : !t.archived && (name === 'All' || (name === 'In review' ? t.reviewed > 0 : t.reviewed === 0))
+  const active = tenders.filter((t) => !t.archived)
   const shown = tenders.filter(
     (t) => `${t.meta.project_name} ${t.name} ${t.meta.location}`.toLowerCase().includes(q.toLowerCase()) && inTab(t, tab),
   )
@@ -55,7 +61,7 @@ export function ProjectsSidebar() {
         <input placeholder="Search tenders…" aria-label="Search tenders" value={q} onChange={(e) => setQ(e.target.value)} />
       </label>
       <div className="project-tabs">
-        {(['All', 'In review', 'New'] as const).map((t) => (
+        {(['All', 'In review', 'New', 'Archived'] as const).map((t) => (
           <button key={t} className={tab === t ? 'active' : ''} onClick={() => setTab(t)}>
             {t} <small>{tenders.filter((x) => inTab(x, t)).length}</small>
           </button>
@@ -82,21 +88,32 @@ export function ProjectsSidebar() {
               </span>
               <i style={{ background: estimate?.tender.id === t.id ? '#1389ff' : t.reviewed ? '#00987a' : '#ff8b38' }} />
             </button>
-            <button className="project-remove" aria-label={`Remove ${t.name}`} title="Remove tender" onClick={() => setConfirm(t.id)}>
-              <Trash2 size={14} />
-            </button>
+            {t.archived ? (
+              <span className="project-archived-actions">
+                <button className="project-remove" aria-label={`Restore ${t.name}`} title="Restore tender" onClick={() => archiveTender(t.id, false)}>
+                  <RotateCcw size={14} />
+                </button>
+                <button className="project-remove" aria-label={`Delete ${t.name} permanently`} title="Delete permanently" onClick={() => setConfirm(t.id)}>
+                  <Trash2 size={14} />
+                </button>
+              </span>
+            ) : (
+              <button className="project-remove" aria-label={`Archive ${t.name}`} title="Move to Archived" onClick={() => archiveTender(t.id, true)}>
+                <Trash2 size={14} />
+              </button>
+            )}
           </div>
         ))}
-        {!shown.length && <p className="muted portfolio-empty">{tenders.length ? 'No tender matches.' : 'No tender imported yet.'}</p>}
+        {!shown.length && <p className="muted portfolio-empty">{tab === 'Archived' ? 'No archived tender.' : active.length ? 'No tender matches.' : 'No tender imported yet.'}</p>}
       </div>
-      <span className="portfolio-note">Stored on the pricing server · {tenders.length} tenders</span>
+      <span className="portfolio-note">Stored on the pricing server · {active.length} tenders{tenders.length > active.length ? ` · ${tenders.length - active.length} archived` : ''}</span>
       {importing && (
         <Modal title="Import a tender" close={() => setImporting(false)}>
           <ImportPanel onDone={() => setImporting(false)} />
         </Modal>
       )}
       {confirm && (
-        <Modal title="Remove this tender?" close={() => setConfirm(null)}>
+        <Modal title="Delete this tender permanently?" close={() => setConfirm(null)}>
           <p>The tender, its estimate, notes and scenarios are deleted from the pricing server. This cannot be undone.</p>
           <div className="modal-actions">
             <Button onClick={() => setConfirm(null)}>Cancel</Button>
@@ -108,7 +125,7 @@ export function ProjectsSidebar() {
                 await removeTender(id)
               }}
             >
-              <Trash2 size={15} /> Remove
+              <Trash2 size={15} /> Delete permanently
             </Button>
           </div>
         </Modal>
@@ -181,7 +198,7 @@ export function Overview() {
   if (!estimate) {
     return (
       <section className="card welcome">
-        <span className="eyebrow">EQUANS TENDER INTELLIGENCE</span>
+        <span className="eyebrow">FAVON TENDER INTELLIGENCE</span>
         <h1>From tender to first price</h1>
         <p className="muted">
           Import a tender package. Every LV position is extracted, matched to the reference data and priced, with the
@@ -212,21 +229,29 @@ export function Overview() {
 
 function Dashboard() {
   const e = useEstimate()
-  const { filter, select } = useStore()
   const navigate = useNavigate()
+  const filter = useStore((s) => s.filter)
   const [editing, setEditing] = useState(false)
   const m = metrics(e.positions)
   const meta = e.tender.meta
-  const systems = systemsOf(e.positions)
-  const tabs = ['Dashboard', 'Positions', 'Review', 'Supplier', 'Experience', 'Bid', 'Export', 'Details']
   const ready = m.open === 0
+  const complete = m.priceable > 0 && m.approved === m.priceable
+  const status: [string, number, string, () => void][] = [
+    ['Approved', m.approved, '#009b7d', () => go('approved', '/positions')],
+    ['Needs attention', m.attention, '#ff7929', () => go('decision', '/matched')],
+    ['Ready to approve', m.open - m.attention, '#a7afbd', () => go('all', '/matched')],
+  ]
+  function go(pill: Pill, url: string) {
+    filter({ pill, system: 'all', search: '', only: null })
+    navigate(url)
+  }
   return (
     <>
       <section className="project-hero card">
         <div className="hero-main">
           <img src="/project-building.jpg" alt="" />
           <div className="hero-title">
-            <span className="eyebrow">EQUANS TENDER INTELLIGENCE</span>
+            <span className="eyebrow">FAVON TENDER INTELLIGENCE</span>
             <h1>{meta.project_name || e.tender.name}</h1>
             <p>
               {meta.trade || 'Tender'} <span className="separator">|</span>{' '}
@@ -251,28 +276,36 @@ function Dashboard() {
               </button>
             </div>
           </div>
-          <div className="hero-progress">
-            <span className={`badge ${ready ? 'success' : 'info'}`}>{ready ? 'Ready to submit' : 'In progress'}</span>
+          <div className="hero-progress hero-status">
             <div className="section-heading">
-              <span>Tender completion</span>
+              <span>Project status</span>
+              <span className={`badge ${ready ? 'success' : 'info'}`}>{ready ? 'Ready to submit' : 'In progress'}</span>
+            </div>
+            <div className="section-heading">
+              <small>
+                {m.approved} of {m.priceable} priced positions approved
+              </small>
               <b>{m.percent}%</b>
             </div>
             <Progress value={m.percent} />
-            <small>
-              {m.approved} of {m.priceable} priced positions approved
-            </small>
+            <div className="hero-status-legend">
+              {status.map(([s, n, c, click]) => (
+                <button key={s} onClick={click}>
+                  <i style={{ background: c }} />
+                  {s} <b>{n}</b>
+                </button>
+              ))}
+            </div>
+            {complete ? (
+              <a className="button small primary report-button" href={api.pricedLvUrl(e.tender.id)}>
+                <Download size={14} /> Download priced tender (PDF)
+              </a>
+            ) : (
+              <button className="button small report-button" disabled title="Approve every priced position first">
+                <Download size={14} /> Download report · {m.priceable - m.approved} still to approve
+              </button>
+            )}
           </div>
-        </div>
-        <div className="project-subnav">
-          {tabs.map((t) => (
-            <button
-              key={t}
-              onClick={() => (t === 'Details' ? setEditing(true) : t !== 'Dashboard' && navigate('/' + t.toLowerCase()))}
-              className={t === 'Dashboard' ? 'active' : ''}
-            >
-              {t}
-            </button>
-          ))}
         </div>
         <Workflow stepsOnly />
       </section>
@@ -281,19 +314,15 @@ function Dashboard() {
           [
             [FileText, 'Total positions', String(m.total), `${m.priceable} priced · ${m.total - m.priceable} summary lines`, 'info', 'all'],
             [CheckCheck, 'Approved', String(m.approved), `${m.percent}% of priced positions`, 'success', 'approved'],
-            [Clock3, 'Needs review', String(m.decision), 'Decision or missing information', 'warning', 'decision'],
-            [MessageSquare, 'Open', String(m.open), `${m.quote} quote · ${m.assumption} assumption`, 'neutral', 'all'],
+            [Clock3, 'Needs attention', String(m.attention), 'Decision, missing information or supplier price', 'warning', 'decision'],
+            [MessageSquare, 'To approve', String(m.open), `of ${m.priceable} priced positions`, 'neutral', 'all'],
             [Database, 'Indicative price', fmtChf(e.project.selling_price_rounded_chf), `Direct cost ${fmtChf(e.project.direct_cost_chf)}`, 'info', 'value'],
           ] as const
         ).map(([I, label, value, sub, color, pill]) => (
           <button
             className="metric card"
             key={label}
-            onClick={() => {
-              if (pill === 'value') return navigate('/review')
-              filter({ pill, system: 'all', search: '', only: null })
-              navigate(pill === 'decision' ? '/review' : '/positions')
-            }}
+            onClick={() => (pill === 'value' ? navigate('/bid') : go(pill, pill === 'decision' ? '/matched' : '/positions'))}
           >
             <span className={`metric-icon ${color}`}>
               <I />
@@ -309,63 +338,6 @@ function Dashboard() {
       <div className="dashboard-grid">
         <Milestones onEdit={() => setEditing(true)} />
         <Calendar />
-        <div className="dashboard-right">
-          <section className="card status-card">
-            <h3>Project status</h3>
-            <div className="status-content">
-              <Ring value={m.percent} size={114} />
-              <div>
-                {(
-                  [
-                    ['Approved', m.approved, '#009b7d'],
-                    ['Needs review', m.decision, '#ff7929'],
-                    ['Open', m.open - m.decision, '#a7afbd'],
-                  ] as const
-                ).map(([s, n, c]) => (
-                  <div className="legend-line" key={s}>
-                    <i style={{ background: c }} />
-                    <span>{s}</span>
-                    <b>{n}</b>
-                  </div>
-                ))}
-                <button className="link-button" onClick={() => navigate('/positions')}>
-                  View positions <ArrowRight size={15} />
-                </button>
-              </div>
-            </div>
-          </section>
-          <section className="card system-completion">
-            <div className="section-heading">
-              <h3>System completion</h3>
-              <small>{systems.length} systems</small>
-            </div>
-            {systems.map((s) => {
-              const mm = metrics(e.positions.filter((p) => p.system === s.id))
-              return (
-                <button
-                  key={s.id}
-                  title={s.id}
-                  onClick={() => {
-                    filter({ system: s.id, pill: 'all', only: null })
-                    navigate('/positions')
-                  }}
-                >
-                  <span className="mini-quarter" style={{ background: s.color }} />
-                  <span>{s.name}</span>
-                  <Progress value={mm.percent} color={s.color} />
-                  <small>{mm.percent}%</small>
-                </button>
-              )
-            })}
-          </section>
-        </div>
-        <Tasks
-          onOpen={(lvId) => {
-            select(lvId)
-            filter({ system: 'all', search: '', pill: 'all', only: null })
-            navigate('/review')
-          }}
-        />
         <section className="card activity">
           <div className="section-heading">
             <h3>Recent activity</h3>
@@ -373,7 +345,7 @@ function Dashboard() {
           </div>
           {[...e.activity]
             .reverse()
-            .slice(0, 5)
+            .slice(0, 6)
             .map((a, i) => (
               <ActivityItem key={i} a={a} />
             ))}
@@ -384,7 +356,10 @@ function Dashboard() {
             </span>
           </div>
         </section>
+      </div>
+      <div className="dashboard-lower">
         <Documents />
+        <ProductLists />
       </div>
       {editing && (
         <Modal title="Project details" close={() => setEditing(false)}>
@@ -420,7 +395,7 @@ function Milestones({ onEdit }: { onEdit: () => void }) {
     ['Tender document issued', !!meta.document_date, meta.document_date || '—'],
     ['Tender imported', true, fmtDate(e.tender.created_at)],
     [`${m.total} positions extracted and priced`, true, fmtDate(e.tender.created_at)],
-    ['Open decisions resolved', m.decision === 0, m.decision === 0 ? (lastReview ? fmtDate(lastReview.at) : 'Done') : `${m.decision} open`],
+    ['Nothing needs attention', m.attention === 0, m.attention === 0 ? (lastReview ? fmtDate(lastReview.at) : 'Done') : `${m.attention} open`],
     ['All positions approved', m.open === 0, m.open === 0 ? (lastReview ? fmtDate(lastReview.at) : 'Done') : `${m.open} open`],
     ['Offer exported', exported, exported && lastExport ? fmtDate(lastExport.at) : 'Open'],
     [
@@ -543,91 +518,6 @@ function Calendar() {
   )
 }
 
-function Tasks({ onOpen }: { onOpen: (lvId: string) => void }) {
-  const e = useEstimate()
-  const navigate = useNavigate()
-  const filter = useStore((s) => s.filter)
-  const due = e.tender.meta.submission_date ? fmtDate(e.tender.meta.submission_date) : '—'
-  const quotes = e.positions.filter((p) => !p.reviewed && p.status === 'supplier_quote_required')
-  const calculated = e.positions.filter((p) => !p.reviewed && p.status === 'calculated')
-  const tasks: { name: string; sub: string; prio: 'High' | 'Medium' | 'Low'; go: () => void }[] = [
-    ...e.positions.filter(needsDecision).map((p) => ({
-      name: positionLabel(p),
-      sub: `${p.lv_id} · ${p.assumptions[0] ?? 'Decide how to price this position'}`,
-      prio: 'High' as const,
-      go: () => onOpen(p.lv_id),
-    })),
-    ...e.checks
-      .filter((c) => c.level === 'warning')
-      .map((c) => ({
-        name: c.title,
-        sub: `Design check · PDF page ${c.pages.join(', ')}`,
-        prio: 'High' as const,
-        go: () => {
-          filter({ only: { label: c.title, ids: c.positions }, pill: 'all', system: 'all' })
-          navigate('/review')
-        },
-      })),
-    ...(quotes.length
-      ? [{ name: 'Request supplier quotes', sub: `${quotes.length} positions priced from package benchmarks`, prio: 'Medium' as const, go: () => navigate('/supplier') }]
-      : []),
-    ...(calculated.length
-      ? [
-          {
-            name: `Approve ${calculated.length} catalogue-priced positions`,
-            sub: 'Exact catalogue match, check and approve',
-            prio: 'Low' as const,
-            go: () => {
-              filter({ pill: 'calculated', system: 'all', only: null })
-              navigate('/review')
-            },
-          },
-        ]
-      : []),
-  ]
-  return (
-    <section className="card tasks">
-      <div className="section-heading">
-        <h3>Open tasks</h3>
-        <button className="text-button" onClick={() => navigate('/review')}>
-          View all <ArrowRight size={14} />
-        </button>
-      </div>
-      <table>
-        <thead>
-          <tr>
-            <th>Task</th>
-            <th>Due date</th>
-            <th>Priority</th>
-          </tr>
-        </thead>
-        <tbody>
-          {tasks.slice(0, 5).map((t, i) => (
-            <tr key={i} onClick={t.go}>
-              <td>
-                {t.name}
-                <small>{t.sub}</small>
-              </td>
-              <td className="due">{due}</td>
-              <td>
-                <span className={`priority ${t.prio === 'High' ? 'high' : t.prio === 'Low' ? 'low' : ''}`}>{t.prio}</span>
-              </td>
-            </tr>
-          ))}
-          {!tasks.length && (
-            <tr>
-              <td colSpan={3}>
-                <Check size={14} /> Nothing open. Export the offer.
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
-      {tasks.length > 5 && <small className="muted">+ {tasks.length - 5} more tasks</small>}
-    </section>
-  )
-}
-
 function Documents() {
   const e = useEstimate()
   const navigate = useNavigate()
@@ -663,6 +553,95 @@ function Documents() {
         </div>
       )}
       <small className="muted">Total CHF {money(e.project.selling_price_rounded_chf)} incl. overhead and margin</small>
+    </section>
+  )
+}
+
+/** Product and technical lists for this tender: drop them in and the prices and product data in them are read out. */
+function ProductLists() {
+  const e = useEstimate()
+  const act = useStore((s) => s.act)
+  const busy = useStore((s) => s.busy)
+  const navigate = useNavigate()
+  const input = useRef<HTMLInputElement>(null)
+  const [drag, setDrag] = useState(false)
+  const add = async (files: FileList | File[]) => {
+    for (const f of Array.from(files)) {
+      await act(`Reading ${f.name}…`, (tid) => api.uploadSheet(tid, f, [], ''), `${f.name} added to the product lists.`)
+    }
+  }
+  const sheets = [...e.sheets].reverse()
+  return (
+    <section className="card product-lists">
+      <div className="section-heading">
+        <h3>Product lists</h3>
+        <Button primary className="small" disabled={!!busy} onClick={() => input.current?.click()}>
+          <Upload size={14} /> Upload
+        </Button>
+      </div>
+      <input
+        ref={input}
+        type="file"
+        multiple
+        hidden
+        accept=".pdf,.xlsx,.xlsm,.csv,.txt"
+        onChange={(ev) => {
+          if (ev.target.files?.length) add(ev.target.files)
+          ev.target.value = ''
+        }}
+      />
+      <div
+        className={`product-drop ${drag ? 'drag' : ''}`}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(ev) => ev.key === 'Enter' && input.current?.click()}
+        onClick={() => !busy && input.current?.click()}
+        onDragOver={(ev) => {
+          ev.preventDefault()
+          setDrag(true)
+        }}
+        onDragLeave={() => setDrag(false)}
+        onDrop={(ev) => {
+          ev.preventDefault()
+          setDrag(false)
+          if (ev.dataTransfer.files.length) add(ev.dataTransfer.files)
+        }}
+      >
+        <Upload size={20} />
+        <span>
+          <strong>Drop product and technical lists here</strong>
+          <small>PDF data sheets, price lists or Excel / CSV product lists. Prices, types, article numbers and lead times are read out.</small>
+        </span>
+      </div>
+      <div className="product-list-files">
+        {sheets.map((s) => (
+          <a key={s.id} href={api.sheetUrl(e.tender.id, s.id)} target="_blank" rel="noreferrer">
+            <span className={`file-icon ${/\.(xlsx|xlsm|csv)$/i.test(s.name) ? 'csv' : ''}`}>{s.name.split('.').pop()?.toUpperCase().slice(0, 4)}</span>
+            <span>
+              {s.name}
+              <small>
+                {s.found.readable
+                  ? [
+                      `${s.found.pages} ${/\.(xlsx|xlsm)$/i.test(s.name) ? 'sheet' : 'page'}${s.found.pages === 1 ? '' : 's'}`,
+                      `${s.found.prices.length} price${s.found.prices.length === 1 ? '' : 's'}`,
+                      s.found.manufacturer,
+                      s.lv_ids.length ? `linked to ${s.lv_ids.length} position${s.lv_ids.length === 1 ? '' : 's'}` : null,
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')
+                  : 'Stored, no readable text'}
+              </small>
+            </span>
+            <ChevronRight size={15} />
+          </a>
+        ))}
+        {!sheets.length && <p className="muted">No product lists yet.</p>}
+      </div>
+      {!!sheets.length && (
+        <button className="text-button" onClick={() => navigate('/supplier')}>
+          Use them for supplier prices <ArrowRight size={14} />
+        </button>
+      )}
     </section>
   )
 }

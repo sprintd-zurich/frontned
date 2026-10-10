@@ -1,15 +1,35 @@
 import type {
   CatalogItem,
+  Dataset,
+  MaterialInflation,
+  NewQuote,
+  Status,
+  Validation,
   Estimate,
   Meta,
   Parameters,
   PositionOverride,
   RfqPackage,
   SupplierDraft,
+  TalkTurn,
+  SupplierInfo,
   SupplierItem,
   SourceLocation,
   TenderSummary,
 } from './types'
+
+export interface DatasetImport {
+  name: string
+  country: string
+  location: string
+  region: string
+  currency: string
+  note?: string
+  base_dataset: string
+  catalog: File
+  productivity: File
+  parameters?: File | null
+}
 
 const BASE = import.meta.env.VITE_API_URL ?? ''
 
@@ -56,6 +76,7 @@ export const api = {
   deleteNote: (id: string, lvId: string, nid: string) =>
     call<Estimate>(`/api/tenders/${id}/positions/${lvId}/notes/${nid}`, { method: 'DELETE' }),
   source: (id: string, lvId: string) => call<SourceLocation>(`/api/tenders/${id}/positions/${lvId}/source`),
+  selectBid: (id: string, scenario: string | null) => call<Estimate>(`/api/tenders/${id}/bid/select`, json('POST', { scenario })),
   setParameters: (id: string, body: Partial<Parameters>) =>
     call<Estimate>(`/api/tenders/${id}/parameters`, json('PATCH', body)),
   saveSnapshot: (id: string, name: string) => call<Estimate>(`/api/tenders/${id}/snapshots`, json('POST', { name })),
@@ -74,11 +95,18 @@ export const api = {
   catalog: () => call<CatalogItem[]>('/api/reference/catalog'),
   productivity: () => call<ProductivityRule[]>('/api/reference/productivity'),
   pageUrl: (id: string, page: number) => `${BASE}/api/tenders/${id}/pages/${page}.png`,
+  pagePositions: (id: string, page: number) =>
+    call<{ lv_id: string; block: { x0: number; y0: number; x1: number; y1: number } | null; lines: { x0: number; y0: number; x1: number; y1: number }[] }[]>(
+      `/api/tenders/${id}/pages/${page}/positions`,
+    ),
   /** a path the backend returned (trace links, files) as a full URL */
   href: (path: string) => `${BASE}${path}`,
+  suppliers: () => call<SupplierInfo[]>('/api/suppliers'),
   supplierItems: (id: string) => call<SupplierItem[]>(`/api/tenders/${id}/supplier/items`),
   supplierDraft: (id: string, lv_ids: string[], supplier: string, contact: string) =>
     call<SupplierDraft>(`/api/tenders/${id}/supplier/draft`, json('POST', { lv_ids, supplier, contact })),
+  markRequested: (id: string, lv_ids: string[], supplier: string) =>
+    call<Estimate>(`/api/tenders/${id}/supplier/requested`, json('POST', { lv_ids, supplier })),
   supplierDraftUrl: (id: string, lvIds: string[], supplier: string) =>
     `${BASE}/api/tenders/${id}/supplier/draft.xlsx?lv_ids=${lvIds.join(',')}&supplier=${encodeURIComponent(supplier)}`,
   uploadSheet: (id: string, file: File, lvIds: string[], supplier: string) => {
@@ -100,5 +128,79 @@ export const api = {
     return call<Estimate>(`/api/tenders/${id}/experience`, { method: 'POST', body: form })
   },
   deleteExperience: (id: string, eid: string) => call<Estimate>(`/api/tenders/${id}/experience/${eid}`, { method: 'DELETE' }),
+  talk: (id: string, turn: { audio?: Blob | null; text?: string; history: { role: string; text: string }[]; speak: boolean }) => {
+    const form = new FormData()
+    if (turn.audio) form.append('audio', turn.audio, `speech.${turn.audio.type.includes('mp4') ? 'mp4' : 'webm'}`)
+    if (turn.text) form.append('text', turn.text)
+    form.append('history', JSON.stringify(turn.history))
+    form.append('speak', String(turn.speak))
+    return call<TalkTurn>(`/api/tenders/${id}/talk`, { method: 'POST', body: form })
+  },
+  applySuggestion: (id: string) => call<Estimate>(`/api/tenders/${id}/experience/suggest/apply`, { method: 'POST' }),
+  removeSuggestionScenario: (id: string) =>
+    call<Estimate>(`/api/tenders/${id}/experience/suggest/apply`, { method: 'DELETE' }),
+  suggestBid: (id: string) => call<Estimate>(`/api/tenders/${id}/experience/suggest`, { method: 'POST' }),
   experienceFileUrl: (id: string, eid: string) => `${BASE}/api/tenders/${id}/experience/${eid}/file`,
+  archive: (id: string, archived: boolean) =>
+    call<{ ok: boolean; archived: boolean }>(`/api/tenders/${id}/archive`, json('PATCH', { archived })),
+  bulk: (id: string, body: { lv_ids: string[]; reviewed?: boolean; status?: Status }) =>
+    call<Estimate>(`/api/tenders/${id}/positions/bulk`, json('POST', body)),
+  setMaterialInflation: (id: string, body: MaterialInflation) =>
+    call<Estimate>(`/api/tenders/${id}/material-inflation`, json('PATCH', body)),
+  validation: (id: string) => call<Validation>(`/api/tenders/${id}/validation`),
+
+  // price books
+  datasets: () => call<Dataset[]>('/api/datasets'),
+  dataset: (did: string) => call<Dataset & { catalog: CatalogItem[] }>(`/api/datasets/${did}`),
+  createDataset: (body: {
+    name: string
+    clone_of?: string
+    region?: string
+    region_label?: string
+    country?: string
+    location?: string
+    material_factor_pct?: number
+    labour_factor_pct?: number
+  }) => call<Dataset>('/api/datasets', json('POST', body)),
+  importDataset: (body: DatasetImport) => {
+    const form = new FormData()
+    form.append('name', body.name)
+    form.append('country', body.country)
+    form.append('location', body.location)
+    form.append('region', body.region)
+    form.append('currency', body.currency)
+    form.append('note', body.note ?? '')
+    form.append('base_dataset', body.base_dataset)
+    form.append('catalog', body.catalog)
+    form.append('productivity', body.productivity)
+    if (body.parameters) form.append('parameters', body.parameters)
+    return call<Dataset>('/api/datasets/import', { method: 'POST', body: form })
+  },
+  deleteDataset: (did: string) => call<{ ok: boolean }>(`/api/datasets/${did}`, { method: 'DELETE' }),
+  setDataset: (id: string, body: { id: string; version?: number }) =>
+    call<Estimate>(`/api/tenders/${id}/dataset`, json('PATCH', body)),
+
+  // supplier quotes on a tender
+  addQuote: (id: string, body: NewQuote) => call<Estimate>(`/api/tenders/${id}/quotes`, json('POST', body)),
+  importQuoteWorkbook: (id: string, file: File, supplier: string, reference: string, quotedAt: string) => {
+    const form = new FormData()
+    form.append('file', file)
+    form.append('supplier', supplier)
+    form.append('reference', reference)
+    form.append('quoted_at', quotedAt)
+    return call<Estimate>(`/api/tenders/${id}/quotes/import`, { method: 'POST', body: form })
+  },
+  importQuoteCsv: (id: string, file: File, supplier: string, reference: string, quotedAt: string) => {
+    const form = new FormData()
+    form.append('file', file)
+    form.append('supplier', supplier)
+    form.append('reference', reference)
+    form.append('quoted_at', quotedAt)
+    return call<Estimate>(`/api/tenders/${id}/quotes/import-csv`, { method: 'POST', body: form })
+  },
+  quoteRequestCsvUrl: (id: string, lvIds: string[]) =>
+    `${BASE}/api/tenders/${id}/quotes/request.csv?lv_ids=${encodeURIComponent(lvIds.join(','))}`,
+  deleteQuote: (id: string, qid: string) => call<Estimate>(`/api/tenders/${id}/quotes/${qid}`, { method: 'DELETE' }),
+  promoteQuote: (id: string, qid: string, datasetId: string) =>
+    call<Estimate>(`/api/tenders/${id}/quotes/${qid}/promote`, json('POST', { dataset_id: datasetId })),
 }

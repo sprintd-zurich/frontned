@@ -1,65 +1,10 @@
-import { useState, type CSSProperties } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState } from 'react'
 import { ChevronDown, ChevronRight, SlidersHorizontal } from 'lucide-react'
-import { metrics, systemsOf } from '../derive'
-import { fmtChf, money } from '../format'
-import { useEstimate, useStore } from '../store'
+import { fmtChf } from '../format'
+import { useEstimate } from '../store'
 import { ParamGroup } from '../components/ParamGroup'
 
 const LINE_COLORS = ['#0785ff', '#7fbfff', '#7752d7', '#b9a6ec', '#ff6a20', '#062969', '#009c7b', '#ffb91d', '#ee3547', '#a4aab7']
-
-/** Direct cost per ventilation system; a click opens its positions. */
-export function SystemsSummary() {
-  const e = useEstimate()
-  const filter = useStore((s) => s.filter)
-  const navigate = useNavigate()
-  const rows = systemsOf(e.positions).map((s) => {
-    const ps = e.positions.filter((p) => p.system === s.id)
-    return { s, m: metrics(ps), hours: ps.reduce((a, p) => a + p.adjusted_install_hours, 0) }
-  })
-  const max = Math.max(...rows.map((r) => r.m.value), 1)
-  const total = rows.reduce((a, r) => a + r.m.value, 0)
-  return (
-    <section className="card systems-summary">
-      <div className="section-heading">
-        <div className="inline">
-          <h2>Systems</h2>
-          <span className="subtitle">
-            {rows.length} systems · {fmtChf(total)} direct position cost
-          </span>
-        </div>
-      </div>
-      <div className="system-rows">
-        {rows.map(({ s, m, hours }) => (
-          <button
-            key={s.id}
-            className="system-row"
-            style={{ '--system-color': s.color } as CSSProperties}
-            onClick={() => {
-              filter({ system: s.id, category: 'all', pill: 'all', search: '', only: null })
-              navigate('/positions')
-            }}
-            title={`Open the ${m.total} positions of ${s.id}`}
-          >
-            <span className="system-name">
-              <i />
-              <strong>{s.name}</strong>
-              <small>
-                {s.code} · {m.total} pos. · {money(hours)} h
-              </small>
-            </span>
-            <span className="system-bar">
-              <span style={{ width: `${(100 * m.value) / max}%` }} />
-            </span>
-            <b>CHF {money(m.value)}</b>
-            <small className="muted">{m.percent}% approved</small>
-            <ChevronRight size={15} />
-          </button>
-        ))}
-      </div>
-    </section>
-  )
-}
 
 /** From the priced positions to the selling price, each line with its basis; the parameters behind it can be edited here. */
 export function CalculatedPrice() {
@@ -78,13 +23,25 @@ export function CalculatedPrice() {
           <SlidersHorizontal size={15} /> Project parameters {edit ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
         </button>
       </div>
-      <div className="buildup-hero">
-        <div>
-          <small>Indicative selling price</small>
-          <strong>{fmtChf(pr.selling_price_rounded_chf)}</strong>
+      <div className="buildup-hero baseline-first">
+        <div className="baseline-main">
+          <small>Cost baseline</small>
+          <strong>{fmtChf(pr.cost_baseline_chf)}</strong>
           <small>
-            rounded up to CHF 1’000 · {pr.target_margin_pct}% margin · {pr.overhead_pct}% overhead
+            direct cost {fmtChf(pr.direct_cost_chf)} + {pr.overhead_pct}% overhead
           </small>
+        </div>
+        <span className="baseline-op">+</span>
+        <div className="baseline-step">
+          <small>Base margin {pr.target_margin_pct}%</small>
+          <b>{fmtChf(margin)}</b>
+          <small>baseline ÷ (1 − {pr.target_margin_pct}%)</small>
+        </div>
+        <span className="baseline-op">=</span>
+        <div className="baseline-step">
+          <small>Indicative selling price</small>
+          <b>{fmtChf(pr.selling_price_rounded_chf)}</b>
+          <small>rounded up to CHF 1’000</small>
         </div>
         <div className="stack-bar" aria-label="Price composition">
           {pr.cost_lines.map((l, i) => (
@@ -123,7 +80,7 @@ export function CalculatedPrice() {
             <td className="muted">{pr.overhead_pct}% of direct cost</td>
             <td className="num">{fmtChf(pr.overhead_chf)}</td>
           </tr>
-          <tr className="subtotal">
+          <tr className="subtotal baseline-row">
             <td>Cost baseline</td>
             <td />
             <td className="num">{fmtChf(pr.cost_baseline_chf)}</td>
@@ -131,7 +88,7 @@ export function CalculatedPrice() {
           <tr>
             <td>
               <i style={{ background: '#00987a' }} />
-              Margin
+              Base margin
             </td>
             <td className="muted">
               baseline ÷ (1 − {pr.target_margin_pct}%) = {fmtChf(pr.selling_price_chf)}

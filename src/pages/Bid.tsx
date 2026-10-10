@@ -1,50 +1,120 @@
-import { useState } from 'react'
-import { Bookmark, RotateCcw, Trash2, TrendingUp } from 'lucide-react'
-import { fmtChf, pct } from '../format'
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
+import { Bookmark, Bot, CheckCircle2, Minus, MousePointerClick, Plus, RotateCcw, Trash2, TrendingUp, X } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { api } from '../api'
+import { inputsOf, previewBid, type BidInputs } from '../bidModel'
+import { fmtChf, fmtWhen, pct } from '../format'
 import { useEstimate, useStore } from '../store'
-import type { BidPoint, BidScenario, Parameters, Snapshot } from '../types'
-import { ParamGroup } from '../components/ParamGroup'
+import type { BidPoint, BidScenario, ExperienceScenario, Parameters, Snapshot } from '../types'
 import { Button, Empty } from '../components/ui'
-import { CalculatedPrice, SystemsSummary } from './BidCost'
+import { CalculatedPrice } from './BidCost'
 
-const TONE: Record<string, string> = { Aggressive: '#ff6a20', Target: '#0785ff', Conservative: '#009c7b' }
+const TONE: Record<string, string> = { Aggressive: '#ff6a20', Target: '#0785ff', Conservative: '#009c7b', Custom: '#c2410c', Experience: '#7b5cf0' }
 
 export function Bid() {
   const e = useEstimate()
   const bid = e.bid
-  const best = bid.scenarios.find((s) => s.scenario === bid.recommended)!
+  const act = useStore((s) => s.act)
+  const busy = useStore((s) => s.busy)
+  // the Custom window edits these; cards and charts follow at once, the backend gets them a moment later
+  const [x, setX] = useState<BidInputs>(() => inputsOf(bid))
+  const [dirty, setDirty] = useState(false)
+  useEffect(() => {
+    if (!dirty) setX(inputsOf(bid))
+  }, [bid, dirty])
+  const deferred = useDeferredValue(x)
+  const target = e.parameters.commercial.target_margin_pct ?? 5.5
+  const step = e.parameters.commercial.round_to_chf ?? 1000
+  const view = useMemo(() => previewBid(bid, deferred, target, step), [bid, deferred, target, step])
+  const timer = useRef<number | undefined>(undefined)
+  const change = (patch: Partial<BidInputs>) => {
+    const next = { ...x, ...patch }
+    setX(next)
+    setDirty(true)
+    window.clearTimeout(timer.current)
+    timer.current = window.setTimeout(async () => {
+      await act('Recalculating…', (tid) => api.setParameters(tid, { bid: next as unknown as Record<string, number> }))
+      setDirty(false)
+    }, 700)
+  }
+  useEffect(() => () => window.clearTimeout(timer.current), [])
+
+  const options = [...view.scenarios, view.custom, ...(view.experience ? [view.experience] : [])]
+  const selected = options.find((s) => s.scenario === bid.selected) ?? null
+  const choose = (name: string | null) =>
+    act('Selecting the bid…', (tid) => api.selectBid(tid, name), name ? `${name} bid goes into the offer and the exports.` : 'Selection cleared: the exports use the indicative selling price.')
+  const prices = options.map((s) => s.bid_price_chf)
+  const lo = Math.min(...prices)
+  const hi = Math.max(...prices)
   return (
     <div className="bid-page">
-      <div className="bid-cost">
-        <SystemsSummary />
-        <CalculatedPrice />
-      </div>
-      <section className="card bid-hero">
+      <CalculatedPrice />
+      <section className="card bid-hero selected-range">
         <div>
           <span className="eyebrow">BID DECISION</span>
-          <h1>Recommended bid range</h1>
+          <h1>Selected bid range</h1>
           <p className="muted">
-            Cost baseline {fmtChf(bid.cost_baseline_chf)} · market reference price {fmtChf(bid.reference_price_chf)} (baseline at
-            the standard {e.parameters.commercial.target_margin_pct ?? 5.5}% margin)
+            Bids are calculated on {fmtChf(view.base)}: the cost baseline {fmtChf(bid.cost_baseline_chf)}
+            {view.avg > 0 && ` plus ${view.avg.toFixed(1)}% average inflation over ${x.duration_months} months`}. Click a bid below to put it in
+            the offer; the priced tender and the workbook carry it.
           </p>
+          <div className="range-strip" aria-label="Bid scenarios on one scale">
+            {options.map((s) => (
+              <button
+                key={s.scenario}
+                className={s.scenario === bid.selected ? 'on' : ''}
+                style={{ left: `${hi > lo ? ((s.bid_price_chf - lo) / (hi - lo)) * 100 : 50}%`, '--tone': TONE[s.scenario] } as React.CSSProperties}
+                title={`${s.scenario} · ${fmtChf(s.bid_price_chf)}`}
+                onClick={() => choose(s.scenario)}
+              >
+                <i />
+                <small>{s.scenario}</small>
+              </button>
+            ))}
+          </div>
         </div>
-        <div className="bid-best">
-          <TrendingUp size={22} />
-          <span>
-            <small>Highest expected contribution</small>
-            <strong>
-              {best.scenario} · {fmtChf(best.bid_price_chf)}
-            </strong>
-            <small>
-              {pct(best.estimated_win_probability)} win chance · {fmtChf(best.expected_contribution_chf)} expected
-            </small>
-          </span>
-        </div>
+        {selected ? (
+          <div className="bid-best selected" style={{ '--tone': TONE[selected.scenario] } as React.CSSProperties}>
+            <CheckCircle2 size={22} />
+            <span>
+              <small>Selected for the offer</small>
+              <strong>
+                {selected.scenario} · {fmtChf(selected.bid_price_chf)}
+              </strong>
+              <small>
+                {selected.margin_pct}% margin · {pct(selected.estimated_win_probability)} win chance · {fmtChf(selected.expected_contribution_chf)}{' '}
+                expected
+              </small>
+            </span>
+            <button className="icon-button" aria-label="Clear the selection" title="Clear: use the indicative price" disabled={!!busy} onClick={() => choose(null)}>
+              <X size={14} />
+            </button>
+          </div>
+        ) : (
+          <div className="bid-best">
+            <MousePointerClick size={22} />
+            <span>
+              <small>No bid selected yet</small>
+              <strong>Exports use {fmtChf(e.project.selling_price_rounded_chf)}</strong>
+              <small>
+                <TrendingUp size={12} /> {view.recommended} has the highest expected contribution
+              </small>
+            </span>
+          </div>
+        )}
       </section>
-      <div className="scenario-grid">
-        {bid.scenarios.map((s) => (
-          <ScenarioCard key={s.scenario} s={s} best={s.scenario === bid.recommended} />
+      <div className={`scenario-grid ${view.experience ? 'five' : 'four'}`}>
+        {view.scenarios.map((s) => (
+          <ScenarioCard key={s.scenario} s={s} best={s.scenario === view.recommended} selected={s.scenario === bid.selected} onSelect={() => choose(s.scenario)} />
         ))}
+        <ScenarioCard s={view.custom} best={false} selected={bid.selected === 'Custom'} onSelect={() => choose('Custom')}>
+          <small className="muted">
+            {view.scenarios.find((s) => s.scenario === 'Target')?.bid_price_chf === view.custom.bid_price_chf
+              ? 'Starts at the Target margin: change the Custom margin below to set your own bid.'
+              : 'Your margin and market numbers from the Custom window below.'}
+          </small>
+        </ScenarioCard>
+        {view.experience && <ExperienceCard x={view.experience} selected={bid.selected === 'Experience'} onSelect={() => choose('Experience')} />}
       </div>
       <div className="bid-charts">
         <section className="card">
@@ -52,9 +122,10 @@ export function Bid() {
           <LineChart
             id="win"
             color="#0785ff"
-            curve={bid.curve}
-            scenarios={bid.scenarios}
-            recommended={bid.recommended}
+            curve={view.curve}
+            scenarios={view.scenarios}
+            extra={[view.custom, ...(view.experience ? [view.experience] : [])]}
+            recommended={view.recommended}
             y={(p) => p.estimated_win_probability}
             fmt={pct}
             max={1}
@@ -65,57 +136,243 @@ export function Bid() {
           <LineChart
             id="contribution"
             color="#7b61ff"
-            curve={bid.curve}
-            scenarios={bid.scenarios}
-            recommended={bid.recommended}
+            curve={view.curve}
+            scenarios={view.scenarios}
+            extra={[view.custom, ...(view.experience ? [view.experience] : [])]}
+            recommended={view.recommended}
             y={(p) => p.expected_contribution_chf}
             fmt={(v) => (v === 0 ? 'CHF 0' : `CHF ${Math.round(v / 1000)}k`)}
           />
-          <small className="muted">Peak on the curve at {bid.peak_margin_pct}% margin.</small>
+          <small className="muted">Peak on the curve at {view.peak}% margin.</small>
         </section>
       </div>
       <div className="bid-bottom">
-        <section className="card">
-          <h3>How the probability is estimated</h3>
-          <p className="formula">
-            win probability = base {pct(bid.inputs.reference_win_probability)} + strategic appetite{' '}
-            {signed(bid.inputs.strategic_appetite_adjustment)} + competition {signed(bid.inputs.competition_adjustment)} −{' '}
-            {Math.round(bid.inputs.price_sensitivity_probability_points_per_1pct_price * 100)} points for every 1% above the
-            reference price, kept between {pct(bid.limits.min_probability)} and {pct(bid.limits.max_probability)}.
-            <br />
-            bid price = cost baseline ÷ (1 − margin), rounded up to CHF 1’000 · expected contribution = win probability × (bid
-            price − cost baseline)
-          </p>
-          <div className="param-grid two">
-            <ParamGroup
-              title="Market and strategy (what-if)"
-              group="bid"
-              values={pick(bid.inputs, [
-                'reference_win_probability',
-                'price_sensitivity_probability_points_per_1pct_price',
-                'strategic_appetite_adjustment',
-                'competition_adjustment',
-              ])}
-              step={0.01}
-            />
-            <ParamGroup title="Scenario margins" group="bid" values={pick(bid.inputs, ['margin_Aggressive', 'margin_Target', 'margin_Conservative'])} step={0.5} />
-          </div>
-        </section>
+        <CustomWindow x={x} change={change} saving={dirty} avg={view.avg} base={view.base} baseline={bid.cost_baseline_chf} limits={bid.limits} />
         <Scenarios />
       </div>
     </div>
   )
 }
 
-function ScenarioCard({ s, best }: { s: BidScenario; best: boolean }) {
+/** A number with round minus / plus buttons either side; type into it too. */
+function Stepper({
+  label,
+  value,
+  set,
+  step,
+  unit,
+  min,
+  max,
+  signed = false,
+  help,
+}: {
+  label: string
+  value: number
+  set: (v: number) => void
+  step: number
+  unit: string
+  min?: number
+  max?: number
+  signed?: boolean
+  help?: string
+}) {
+  const [text, setText] = useState<string | null>(null)
+  const clamp = (v: number) => Math.min(max ?? Infinity, Math.max(min ?? -Infinity, Math.round(v * 100) / 100))
+  const shown = `${signed && value > 0 ? '+' : ''}${Number(value.toFixed(2))}`
   return (
-    <section className={`card scenario-card ${best ? 'best' : ''}`} style={{ '--tone': TONE[s.scenario] ?? '#0785ff' } as React.CSSProperties}>
+    <div className="stepper">
+      <span className="stepper-label">
+        {label}
+        {help && <small>{help}</small>}
+      </span>
+      <div className="stepper-control">
+        <button aria-label={`Less ${label}`} onClick={() => set(clamp(value - step))} disabled={min != null && value <= min}>
+          <Minus size={15} />
+        </button>
+        <label>
+          <input
+            aria-label={label}
+            inputMode="decimal"
+            value={text ?? shown}
+            onFocus={(ev) => ev.target.select()}
+            onChange={(ev) => setText(ev.target.value)}
+            onBlur={() => {
+              const v = Number((text ?? '').replace(',', '.').replace('+', ''))
+              if (text != null && text.trim() !== '' && Number.isFinite(v)) set(clamp(v))
+              setText(null)
+            }}
+            onKeyDown={(ev) => ev.key === 'Enter' && ev.currentTarget.blur()}
+          />
+          <span>{unit}</span>
+        </label>
+        <button aria-label={`More ${label}`} onClick={() => set(clamp(value + step))} disabled={max != null && value >= max}>
+          <Plus size={15} />
+        </button>
+      </div>
+    </div>
+  )
+}
+
+/** The estimator's own numbers: margin, market view, inflation over the project duration. */
+function CustomWindow({
+  x,
+  change,
+  saving,
+  avg,
+  base,
+  baseline,
+  limits,
+}: {
+  x: BidInputs
+  change: (p: Partial<BidInputs>) => void
+  saving: boolean
+  avg: number
+  base: number
+  baseline: number
+  limits: { min_probability: number; max_probability: number }
+}) {
+  const pts = (v: number) => Math.round(v * 1000) / 10
+  return (
+    <section className="card custom-window">
+      <div className="section-heading">
+        <div>
+          <h3>Custom</h3>
+          <p className="muted">Set your own numbers; the Custom bid, the other scenarios and both charts follow as you change them.</p>
+        </div>
+        <small className={`save-state ${saving ? 'busy' : ''}`}>{saving ? 'Saving…' : 'Saved'}</small>
+      </div>
+      <div className="custom-groups">
+        <div className="custom-group">
+          <h4>Your bid</h4>
+          <Stepper label="Custom margin" value={x.margin_Custom} set={(v) => change({ margin_Custom: v })} step={0.5} unit="%" min={-20} max={40} />
+          <Stepper label="Aggressive margin" value={x.margin_Aggressive} set={(v) => change({ margin_Aggressive: v })} step={0.5} unit="%" min={-20} max={40} />
+          <Stepper label="Target margin" value={x.margin_Target} set={(v) => change({ margin_Target: v })} step={0.5} unit="%" min={-20} max={40} />
+          <Stepper label="Conservative margin" value={x.margin_Conservative} set={(v) => change({ margin_Conservative: v })} step={0.5} unit="%" min={-20} max={40} />
+        </div>
+        <div className="custom-group">
+          <h4>Market</h4>
+          <Stepper
+            label="Base win probability"
+            help="at the market reference price"
+            value={pts(x.reference_win_probability)}
+            set={(v) => change({ reference_win_probability: v / 100 })}
+            step={1}
+            unit="%"
+            min={0}
+            max={100}
+          />
+          <Stepper
+            label="Win chance lost per +1% price"
+            value={pts(x.price_sensitivity_probability_points_per_1pct_price)}
+            set={(v) => change({ price_sensitivity_probability_points_per_1pct_price: v / 100 })}
+            step={0.5}
+            unit="pts"
+            min={0}
+            max={50}
+          />
+          <Stepper label="Strategic appetite" value={pts(x.strategic_appetite_adjustment)} set={(v) => change({ strategic_appetite_adjustment: v / 100 })} step={1} unit="pts" signed min={-50} max={50} />
+          <Stepper label="Competition" value={pts(x.competition_adjustment)} set={(v) => change({ competition_adjustment: v / 100 })} step={1} unit="pts" signed min={-50} max={50} />
+          <small className="muted">
+            Win chance stays between {pct(limits.min_probability)} and {pct(limits.max_probability)}.
+          </small>
+        </div>
+        <div className="custom-group">
+          <h4>Inflation</h4>
+          <Stepper label="Inflation" help="per year" value={x.inflation_pct} set={(v) => change({ inflation_pct: v })} step={0.25} unit="%" min={0} max={20} />
+          <Stepper label="Duration" help="project life span" value={x.duration_months} set={(v) => change({ duration_months: v })} step={1} unit="months" min={0} max={120} />
+          <div className="inflation-result">
+            <span>Average over the duration</span>
+            <b>{avg.toFixed(2)}%</b>
+            <span>Added to the bids</span>
+            <b>{fmtChf(base - baseline)}</b>
+            <span>Bids calculated on</span>
+            <b>{fmtChf(base)}</b>
+          </div>
+          <small className="muted">Costs fall evenly over the duration, so on average they are bought half-way through it.</small>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+/** The bid suggested from the team's experience: same scoring as the calculated scenarios, traced to the Experience tab. */
+function ExperienceCard({ x, selected, onSelect }: { x: ExperienceScenario; selected: boolean; onSelect: () => void }) {
+  const act = useStore((st) => st.act)
+  const navigate = useNavigate()
+  return (
+    <ScenarioCard s={x} best={false} selected={selected} onSelect={onSelect}>
+      <div className="experience-scenario-foot">
+        <small className="muted">
+          Range {fmtChf(x.low_chf)} – {fmtChf(x.high_chf)} · suggested by {x.model} from the team's experience · {fmtWhen(x.suggestion_at)}
+        </small>
+        <div>
+          <Button
+            className="small"
+            onClick={() => navigate('/experience')}
+          >
+            Why this price?
+          </Button>
+          <button
+            className="icon-button"
+            aria-label="Remove the Experience scenario"
+            title="Remove from the bid"
+            onClick={(ev) => {
+              ev.stopPropagation()
+              act('Removing…', (tid) => api.removeSuggestionScenario(tid), 'Experience scenario removed.')
+            }}
+          >
+            <Trash2 size={14} />
+          </button>
+        </div>
+      </div>
+    </ScenarioCard>
+  )
+}
+
+function ScenarioCard({
+  s,
+  best,
+  selected,
+  onSelect,
+  children,
+}: {
+  s: BidScenario
+  best: boolean
+  selected: boolean
+  onSelect: () => void
+  children?: React.ReactNode
+}) {
+  const ai = s.scenario === 'Experience'
+  return (
+    <section
+      className={`card scenario-card selectable ${best ? 'best' : ''} ${selected ? 'selected' : ''}`}
+      style={{ '--tone': TONE[s.scenario] ?? '#0785ff' } as React.CSSProperties}
+      role="button"
+      tabIndex={0}
+      aria-pressed={selected}
+      onClick={(ev) => {
+        if ((ev.target as HTMLElement).closest('button')) return
+        onSelect()
+      }}
+      onKeyDown={(ev) => (ev.key === 'Enter' || ev.key === ' ') && ev.target === ev.currentTarget && (ev.preventDefault(), onSelect())}
+    >
       <div className="section-heading">
         <span className="scenario-name">
           <span className="semicircle" />
           {s.scenario}
         </span>
-        {best && <span className="badge success">Recommended</span>}
+        {selected ? (
+          <span className="badge selected-badge">
+            <CheckCircle2 size={12} /> Selected
+          </span>
+        ) : best ? (
+          <span className="badge success">Recommended</span>
+        ) : null}
+        {ai && (
+          <span className="ai-badge">
+            <Bot size={12} /> AI suggestion
+          </span>
+        )}
       </div>
       <strong className="scenario-price">{fmtChf(s.bid_price_chf)}</strong>
       <dl>
@@ -137,6 +394,8 @@ function ScenarioCard({ s, best }: { s: BidScenario; best: boolean }) {
           <dd>{fmtChf(s.expected_contribution_chf)}</dd>
         </div>
       </dl>
+      {children}
+      {!selected && <small className="select-hint">Click to use this bid</small>}
     </section>
   )
 }
@@ -161,6 +420,7 @@ function LineChart({
   id,
   curve,
   scenarios,
+  extra,
   recommended,
   y,
   fmt,
@@ -170,6 +430,8 @@ function LineChart({
   id: string
   curve: BidPoint[]
   scenarios: BidScenario[]
+  /** drawn as markers only, outside the scenario band (Custom, Experience) */
+  extra?: BidScenario[]
   recommended: string
   y: (p: BidPoint) => number
   fmt: (v: number) => string
@@ -238,7 +500,7 @@ function LineChart({
           <path d={area} fill={`url(#fill-${id})`} />
           <path d={path} className="line" stroke={color} filter={`url(#glow-${id})`} />
         </g>
-        {scenarios.map((s, i) => {
+        {[...scenarios, ...(extra ?? []).filter((x) => x.margin_pct >= 0 && x.margin_pct <= xMax)].map((s, i) => {
           const v = y({ ...curve[0], ...s })
           const tone = TONE[s.scenario]
           const label = s.scenario === recommended ? `${s.scenario} ★` : s.scenario
@@ -403,10 +665,4 @@ function niceCeil(v: number) {
   return ([1, 2, 4, 5, 10].find((m) => m * p >= v) ?? 10) * p
 }
 
-function pick(o: Record<string, number>, keys: string[]) {
-  return Object.fromEntries(keys.filter((k) => k in o).map((k) => [k, o[k]]))
-}
 
-function signed(v: number) {
-  return `${v >= 0 ? '+' : '−'}${Math.round(Math.abs(v) * 100)} points`
-}

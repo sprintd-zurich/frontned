@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { ArrowUpDown, ChevronLeft, ChevronRight, Search, SlidersHorizontal, X } from 'lucide-react'
-import { PILLS, isBlocker, isDuctList, needsDecision, pillMatch, systemsOf } from '../derive'
+import { PILLS, PILL_TONE, isBlocker, isDuctList, needsDecision, pillMatch, systemsOf } from '../derive'
 import { STATUS_META, fmtNum, money, unit } from '../format'
 import { useEstimate, useStore } from '../store'
 import type { Position } from '../types'
@@ -21,7 +22,7 @@ function baseFilter(ps: Position[], s: ReturnType<typeof useStore.getState>, rev
       (s.section === 'all' || p.section === s.section) &&
       (!s.hideDucts || !isDuctList(p)) &&
       (!q ||
-        `${p.lv_id} ${p.title} ${p.variant} ${p.description} ${p.product_id ?? ''} ${p.product_description ?? ''} ${p.install_code ?? ''}`
+        `${p.ref} ${p.lv_id} ${p.title} ${p.variant} ${p.description} ${p.product_id ?? ''} ${p.product_description ?? ''} ${p.install_code ?? ''}`
           .toLowerCase()
           .includes(q)),
   )
@@ -46,9 +47,9 @@ export function Filters({ review = false }: { review?: boolean }) {
   return (
     <>
       <div className="filters">
-        <div className="filter-pills">
+        <div className="filter-pills status-pills">
           {PILLS.map(([k, label]) => (
-            <button key={k} onClick={() => s.filter({ pill: k })} className={s.pill === k ? 'active' : ''}>
+            <button key={k} onClick={() => s.filter({ pill: k })} className={`tone-${PILL_TONE[k]} ${s.pill === k ? 'active' : ''}`}>
               {review && k === 'all' ? 'Open' : label} <span>{base.filter((p) => pillMatch(p, k)).length}</span>
             </button>
           ))}
@@ -118,8 +119,8 @@ export function EditedTag({ p }: { p: Position }) {
 }
 
 export function PositionTable({ rows, mode = 'positions', limit = 8 }: { rows: Position[]; mode?: Mode; limit?: number }) {
-  const e = useEstimate()
   const { selected, select, clearFilters } = useStore()
+  const navigate = useNavigate()
   const [page, setPage] = useState(0)
   const [sort, setSort] = useState(0)
   const [size, setSize] = useState(limit)
@@ -140,10 +141,14 @@ export function PositionTable({ rows, mode = 'positions', limit = 8 }: { rows: P
     const i = ordered.findIndex((p) => p.lv_id === selected)
     if (i >= 0) setPage((pg) => (Math.floor(i / size) === pg ? pg : Math.floor(i / size)))
   }, [selected, ordered, size])
+  const body = useRef<HTMLTableSectionElement>(null)
+  // a selection made elsewhere (a click on the tender page) scrolls its row into view
+  useEffect(() => {
+    body.current?.querySelector('tr.selected')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+  }, [selected, page])
   const visible = ordered.slice(page * size, page * size + size)
   const calc = mode === 'calculation'
   const read = mode === 'positions'
-  const cats = Object.fromEntries(e.categories.map((c) => [c.id, c]))
   return (
     <>
       <div className="table-toolbar">
@@ -210,9 +215,8 @@ export function PositionTable({ rows, mode = 'positions', limit = 8 }: { rows: P
               </tr>
             )}
           </thead>
-          <tbody>
+          <tbody ref={body}>
             {visible.map((p) => {
-              const c = cats[p.category]
               return (
                 <tr
                   tabIndex={0}
@@ -230,7 +234,7 @@ export function PositionTable({ rows, mode = 'positions', limit = 8 }: { rows: P
                   {read ? (
                     <>
                       <td className="pos-cell">
-                        {p.lv_id}
+                        {p.ref ?? p.lv_id}
                         <EditedTag p={p} />
                       </td>
                       <td className="system-cell" title={p.system}>
@@ -239,11 +243,7 @@ export function PositionTable({ rows, mode = 'positions', limit = 8 }: { rows: P
                       </td>
                       <td className="num">{p.source_page}</td>
                       <td>
-                        {c && (
-                          <span className="category-tag" style={{ '--cat': c.color } as CSSProperties}>
-                            {c.label}
-                          </span>
-                        )}
+                        {p.category && <span className="category-tag product-category">{p.category}</span>}
                       </td>
                       <td className="description-cell">
                         {p.title}
@@ -255,7 +255,7 @@ export function PositionTable({ rows, mode = 'positions', limit = 8 }: { rows: P
                   ) : (
                     <>
                       <td className="pos-cell">
-                        {p.lv_id}
+                        {p.ref ?? p.lv_id}
                         <small>p. {p.source_page}</small>
                       </td>
                       <td className="description-cell">
@@ -267,7 +267,7 @@ export function PositionTable({ rows, mode = 'positions', limit = 8 }: { rows: P
                       <td>{unit(p.unit)}</td>
                       <td className="product-cell">
                         {p.product_id ?? (p.install_code && p.install_code !== 'UNKNOWN' ? 'labour only' : '—')}
-                        {p.product_description && <small>{p.product_description}</small>}
+                        {p.product_description && !calc && <small>{p.product_description}</small>}
                       </td>
                       {calc ? (
                         <>
@@ -296,7 +296,20 @@ export function PositionTable({ rows, mode = 'positions', limit = 8 }: { rows: P
                         </>
                       )}
                       <td>
-                        <ChevronRight size={16} />
+                        {calc ? (
+                          <button
+                            className="button small row-review"
+                            onClick={(ev) => {
+                              ev.stopPropagation()
+                              select(p.lv_id)
+                              navigate('/matched')
+                            }}
+                          >
+                            Review
+                          </button>
+                        ) : (
+                          <ChevronRight size={16} />
+                        )}
                       </td>
                     </>
                   )}

@@ -35,6 +35,10 @@ export const hasCompanyData = (p: Position) =>
   !needsDecision(p) && p.quantity != null && p.match_kind !== 'unknown' && (!!p.product_id || (!!p.install_code && p.install_code !== 'UNKNOWN'))
 /** Everything an estimator still has to sign off before the offer goes out. */
 export const isBlocker = (p: Position) => isPriceable(p) && !p.reviewed
+/** open positions a person has to act on: a decision, missing information or a supplier to contact */
+export const needsHuman = (p: Position) => needsDecision(p) || (!p.reviewed && p.status === 'supplier_quote_required')
+/** a supplier-package price from the price book: an estimate until the supplier's own price comes back */
+export const isBenchmark = (p: Position) => p.price_source === 'supplier_package' && !p.quote && !p.overridden?.includes('net_unit_cost_chf')
 export const isDuctList = (p: Position) => p.kind.startsWith('duct') || p.kind.startsWith('fitting')
 
 export function metrics(ps: Position[]) {
@@ -46,11 +50,13 @@ export function metrics(ps: Position[]) {
     priceable: priceable.length,
     approved,
     decision,
+    /** to approve and waiting on a person: a decision, missing information or a supplier price */
+    attention: priceable.filter(needsHuman).length,
     quote: priceable.filter((p) => !p.reviewed && p.status === 'supplier_quote_required').length,
     assumption: priceable.filter((p) => !p.reviewed && p.status === 'assumption_applied').length,
     open: priceable.length - approved,
     value: ps.reduce((s, p) => s + p.direct_position_cost_chf, 0),
-    percent: priceable.length ? Math.round((approved / priceable.length) * 100) : 0,
+    percent: priceable.length ? Math.floor((approved / priceable.length) * 100) : 0,
   }
 }
 
@@ -64,6 +70,17 @@ export const PILLS = [
   ['approved', 'Approved'],
 ] as const
 export type Pill = (typeof PILLS)[number][0]
+
+/** the colour of each status filter is the colour of its status tag in the table */
+export const PILL_TONE: Record<string, string> = {
+  all: 'neutral',
+  decision: 'warning',
+  supplier: 'violet',
+  assumption: 'amber',
+  calculated: 'info',
+  approved: 'success',
+}
+
 
 export function pillMatch(p: Position, pill: Pill) {
   switch (pill) {
