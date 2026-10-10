@@ -1,0 +1,60 @@
+# Every push to main: build the web app (type check included) and roll it out to Azure Container Apps.
+#
+# Azure sign-in uses OpenID Connect: GitHub hands the job a short-lived token that the Azure identity
+# "favon-github-deploy" accepts only for pushes to main of this repo. No password or key is stored in GitHub; the
+# three ids below are not secrets. That identity may only push images to the registry and manage resource group
+# favon-rg.
+name: Deploy web app to Azure
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  id-token: write   # for the Azure OIDC sign-in
+  contents: read
+
+concurrency:
+  group: deploy-azure-web
+  cancel-in-progress: false
+
+env:
+  AZURE_CLIENT_ID: c02d93db-2f3a-4df9-a369-13f0a3ba7265
+  AZURE_TENANT_ID: 901b7fc9-2d4b-4a3a-892a-8597d7b8ce2c
+  AZURE_SUBSCRIPTION_ID: 0a8ed2ac-7759-4b60-bd17-7b1aaaa62fe7
+  RESOURCE_GROUP: favon-rg
+  REGISTRY: favonacrg5uqtzk7pnbj4
+  CONTAINER_APP: favon-web
+  IMAGE: favon-web
+  PUBLIC_URL: https://favon-web.bravehill-58c68ebd.switzerlandnorth.azurecontainerapps.io
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ env.AZURE_CLIENT_ID }}
+          tenant-id: ${{ env.AZURE_TENANT_ID }}
+          subscription-id: ${{ env.AZURE_SUBSCRIPTION_ID }}
+      - name: Build and push the image
+        # The Dockerfile runs `npm run build`, which type-checks first, so a broken build stops here.
+        run: |
+          TAG="${GITHUB_SHA::7}-${GITHUB_RUN_NUMBER}"
+          az acr login --name "$REGISTRY"
+          docker build --tag "$REGISTRY.azurecr.io/$IMAGE:$TAG" .
+          docker push "$REGISTRY.azurecr.io/$IMAGE:$TAG"
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
+      - name: Roll out to Container Apps
+        run: |
+          az containerapp update --resource-group "$RESOURCE_GROUP" --name "$CONTAINER_APP" \
+            --image "$REGISTRY.azurecr.io/$IMAGE:$TAG" --output none
+      - name: Check the live site
+        run: |
+          for i in $(seq 1 30); do
+            curl -sf --max-time 10 -o /dev/null "$PUBLIC_URL/" && echo "live: $PUBLIC_URL" && exit 0
+            sleep 10
+          done
+          echo "The site did not answer at $PUBLIC_URL" && exit 1

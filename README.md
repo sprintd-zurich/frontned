@@ -14,6 +14,13 @@ npm run dev        # http://localhost:5173, proxies /api to the backend on :8000
 Start the backend first (see the backend repo). To point at another API, set
 `VITE_API_URL=https://api.example.com` before `npm run build`.
 
+## Deploy
+
+`Dockerfile` builds the app and serves it with nginx, which forwards `/api` to the pricing API given in `API_URL`
+(`nginx.conf.template`). Deploying to Azure Container Apps is done from the backend repo:
+`deploy/azure/deploy.sh` (see its README). Every push to `main` redeploys the web app automatically
+(`.github/workflows/deploy-azure.yml`).
+
 ## Screens
 
 The top bar has **Projects**, then the work steps **Positions · Review · Bid · Export**.
