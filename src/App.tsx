@@ -26,7 +26,7 @@ const WORK = [
 export default function App() {
   const loc = useLocation()
   const navigate = useNavigate()
-  const { estimate, ready, init, search, filter, toast, notify, error, busy } = useStore()
+  const { estimate, ready, init, search, filter, toast, notify, error, busy, close } = useStore()
   const [modal, setModal] = useState<'' | 'help' | 'profile'>('')
   const page = loc.pathname
   const overview = page === '/' || !estimate
@@ -46,7 +46,8 @@ export default function App() {
   return (
     <>
       <header className="topbar">
-        <NavLink to="/" className="brand" aria-label="EQUANS projects">
+        {/* The logo leads back to the start page: it closes the open tender (it stays under My tenders). */}
+        <NavLink to="/" className="brand" aria-label="EQUANS start page" onClick={close}>
           EQUANS
         </NavLink>
         <nav>
