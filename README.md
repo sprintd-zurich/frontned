@@ -1,4 +1,4 @@
-# EQUANS Tender Intelligence — frontend
+# Favon Tender Intelligence — frontend
 
 React 19 + TypeScript + Vite web app (design by Tomas, wired to the pricing backend) for Equans estimators: upload a tender, review every
 extracted LV position with its source page, adjust matches, quantities and rates, and see

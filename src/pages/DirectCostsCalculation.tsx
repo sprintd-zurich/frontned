@@ -868,7 +868,7 @@ function DirectCostsContent() {
             </div>
 
             <div className="guardrail-note">
-              🛡️ <b>Equans Guardrail:</b> Visible assumptions and review flags are better than false precision.
+              🛡️ <b>Guardrail:</b> Visible assumptions and review flags are better than false precision.
             </div>
           </div>
 

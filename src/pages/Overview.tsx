@@ -182,7 +182,7 @@ export function Overview() {
   if (!estimate) {
     return (
       <section className="card welcome">
-        <span className="eyebrow">EQUANS TENDER INTELLIGENCE</span>
+        <span className="eyebrow">FAVON TENDER INTELLIGENCE</span>
         <h1>From tender to first price</h1>
         <p className="muted">
           Import a tender package. Every LV position is extracted, matched to the reference data and priced, with the
@@ -234,7 +234,7 @@ function Dashboard() {
         <div className="hero-main">
           <img src="/project-building.jpg" alt="" />
           <div className="hero-title">
-            <span className="eyebrow">EQUANS TENDER INTELLIGENCE</span>
+            <span className="eyebrow">FAVON TENDER INTELLIGENCE</span>
             <h1>{meta.project_name || e.tender.name}</h1>
             <p>
               {meta.trade || 'Tender'} <span className="separator">|</span>{' '}

@@ -49,8 +49,8 @@ export default function App() {
   return (
     <>
       <header className="topbar">
-        <NavLink to="/" className="brand" aria-label="EQUANS projects">
-          EQUANS
+        <NavLink to="/" className="brand" aria-label="Favon projects">
+          FAVON
         </NavLink>
         <nav>
           <NavLink to="/" end className={({ isActive }) => (isActive ? 'active' : '')}>
