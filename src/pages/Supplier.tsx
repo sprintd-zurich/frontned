@@ -7,6 +7,7 @@ import { useEstimate, useStore } from '../store'
 import type { Position, SupplierDraft, SupplierItem } from '../types'
 import { SheetCard, SheetUpload } from '../components/Sheets'
 import { Split } from '../components/Split'
+import { CategoryStrip } from '../components/Shell'
 import { SourceLine } from '../components/Trace'
 import { Button, Empty } from '../components/ui'
 
@@ -39,6 +40,10 @@ export function Supplier() {
     .filter(({ p }) => show === 'all' || (show === 'received' ? received(p) : !received(p)))
     .filter(({ p }) => category === 'all' || p.category === category)
     .filter(({ p }) => !q || `${p.lv_id} ${p.title} ${p.variant} ${p.system}`.toLowerCase().includes(q))
+  const inView = (items ?? [])
+    .map((i) => byId.get(i.lv_id))
+    .filter((p): p is Position => !!p && (category === 'all' || p.category === category))
+  const counts = { open: inView.filter((p) => !received(p)).length, received: inView.filter(received).length, all: inView.length }
   const groups = [...new Set(rows.map((r) => r.package_title))].map((title) => ({
     title,
     rows: rows.filter((r) => r.package_title === title),
@@ -64,16 +69,17 @@ export function Supplier() {
               <span className="subtitle">{open} positions still need a supplier price</span>
             </div>
           </div>
-          <div className="filter-pills">
+          <CategoryStrip />
+          <div className="filter-pills status-pills">
             {(
               [
-                ['open', 'Missing price'],
-                ['received', 'Priced from a sheet'],
-                ['all', 'All'],
+                ['open', 'Missing price', 'violet'],
+                ['received', 'Priced from a sheet', 'success'],
+                ['all', 'All', 'neutral'],
               ] as const
-            ).map(([k, label]) => (
-              <button key={k} className={show === k ? 'active' : ''} onClick={() => setShow(k)}>
-                {label}
+            ).map(([k, label, tone]) => (
+              <button key={k} className={`tone-${tone} ${show === k ? 'active' : ''}`} onClick={() => setShow(k)}>
+                {label} <span>{counts[k]}</span>
               </button>
             ))}
           </div>
