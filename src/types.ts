@@ -8,6 +8,8 @@ export type Status =
   | 'non_priceable'
 
 export interface Position {
+  /** Where this position sits in the tender: system, section, PDF page, item on that page. */
+  ref: string
   lv_id: string
   system: string
   section: string | null
@@ -45,7 +47,10 @@ export interface Position {
   /** stays true once the estimator changed anything on the position, even after a reset */
   edited: boolean
   edited_fields: string[]
+  /** product category (Damper, Ductwork, …), editable on the Items tab */
   category: string
+  /** HVAC trade colour group (air, heating, …) */
+  trade: string
   /** where each number comes from, keyed by field */
   trace: Partial<Record<TraceField, Trace>>
   reviewed: boolean
@@ -55,6 +60,16 @@ export interface Position {
   price_sheet: string | null
   /** product sheets linked to this position */
   sheets: string[]
+  base_material_cost_chf: number
+  material_inflation_chf: number
+  material_mix: Record<string, number>
+  /** The supplier quote that set this price, if any. */
+  quote: Quote | null
+  /** What the pinned price book charges for the matched product, for comparison with a quote. */
+  book_unit_cost_chf: number | null
+  /** Placeholder material cost for positions with no price; never folded into material_cost_chf. */
+  estimated_material_chf: number | null
+  estimated_material_basis: string | null
 }
 
 export type TraceField =
@@ -216,7 +231,7 @@ export interface Note {
 
 export interface Activity {
   at: string
-  kind: 'import' | 'change' | 'review' | 'note' | 'export' | 'scenario' | 'meta' | 'sheet' | 'experience'
+  kind: 'import' | 'change' | 'review' | 'note' | 'export' | 'scenario' | 'meta' | 'sheet' | 'experience' | 'dataset' | 'quote' | 'warning'
   text: string
   lv_id: string | null
 }
@@ -240,8 +255,17 @@ export interface TenderSummary {
   pages: number
   positions: number
   created_at: string
+  updated_at: string
   reviewed: number
+  priceable_positions: number
   meta: Meta
+  archived: boolean
+  workflow_status: 'in_review' | 'waiting_for_quotes' | 'ready_to_bid'
+  completion_pct: number
+  open_decisions: number
+  supplier_quotes_open: number
+  selling_price_chf: number
+  last_activity: string
 }
 
 export interface Box {
@@ -285,6 +309,7 @@ export interface CostLine {
 export interface Project {
   cost_lines: CostLine[]
   material_cost_chf: number
+  material_inflation_chf: number
   labour_cost_chf: number
   install_hours: number
   direct_cost_chf: number
@@ -294,6 +319,8 @@ export interface Project {
   target_margin_pct: number
   selling_price_chf: number
   selling_price_rounded_chf: number
+  unpriced_material_chf: number
+  unpriced_coverage_pct: number
 }
 
 export interface Parameters {
@@ -383,6 +410,11 @@ export interface Estimate {
   bid_suggestion: BidSuggestion | null
   suggestion_service: { configured: boolean; model: string }
   voice_service: { configured: boolean }
+  dataset: TenderDataset
+  quotes: Quote[]
+  confidence: Confidence
+  extraction: Extraction
+  material_inflation: MaterialInflation
 }
 
 export interface CatalogItem {
@@ -402,6 +434,14 @@ export interface CatalogItem {
 }
 
 export interface PositionOverride {
+  ref?: string
+  system?: string
+  category?: string
+  title?: string
+  variant?: string
+  description?: string
+  unit?: string
+  material_mix?: Record<string, number>
   product_id?: string
   quantity?: number
   net_unit_cost_chf?: number
@@ -424,4 +464,206 @@ export interface RfqPackage {
   pages: number[]
   lines: { lv_id: string; system: string; text: string; quantity: number | null; unit: string; source_page: number }[]
   text: string
+}
+
+export interface MaterialInflation {
+  base_date: string
+  as_of_date: string
+  rates_pct: Record<string, number>
+}
+
+export interface UnreadPage {
+  page: number
+  first_line: string
+  quantity_lines: number
+}
+
+export interface Extraction {
+  pages: number
+  project: string
+  header_pattern: 'bkp_code' | 'running_header' | null
+  lv_pages: number
+  duct_list_pages: number
+  front_matter_pages: number
+  trailing_pages: number
+  body_pages: number
+  read_pages: number
+  positions: number
+  systems: { system: string; pages: number; positions: number }[]
+  unread: UnreadPage[]
+  missed_pages: UnreadPage[]
+  warnings: string[]
+}
+
+/** A supplier price recorded on one tender. Beats the price book, loses to an estimator override. */
+export interface Quote {
+  id: string
+  /** Set when the quote is for a catalogue product (reusable, can be promoted to a price book). */
+  product_id: string | null
+  /** Set when the quote is for one specific LV position that has no catalogue item. */
+  lv_id: string | null
+  supplier: string
+  reference: string
+  net_cost_chf: number
+  /** The price book's figure for the same product, so the delta stays visible. */
+  book_cost_chf: number | null
+  quoted_at: string
+  valid_until: string
+  note: string
+  entered_by: string | null
+  at: string
+}
+
+/** What the estimator fills in when a supplier price comes back. */
+export interface NewQuote {
+  net_cost_chf: number
+  supplier: string
+  product_id?: string | null
+  lv_id?: string | null
+  reference?: string
+  quoted_at?: string
+  valid_until?: string
+  note?: string
+  entered_by?: string | null
+}
+
+export interface DatasetVersion {
+  version: number
+  created_at: string
+  source: string
+  note: string
+  derived_from: { dataset: string; version: number; material_factor_pct: number; labour_factor_pct: number } | null
+  changes: {
+    product_id: string
+    kind: 'price_updated' | 'item_added'
+    was_chf?: number
+    now_chf: number
+    supplier?: string
+    reference?: string
+    quoted_at?: string
+    from_tender?: string
+    entered_by?: string | null
+  }[]
+}
+
+/** A price book: catalogue, installation rules with their labour rates, and project parameters. */
+export interface Dataset {
+  id: string
+  name: string
+  region: string
+  region_label: string
+  country: string
+  location: string
+  currency: string
+  notes: string
+  immutable: boolean
+  derived?: boolean
+  source_kind: 'csv' | 'derived' | string
+  source_files: string[]
+  versions: DatasetVersion[]
+  latest_version: number
+  products: number
+  install_rules: number
+  labour_rate_chf: number
+  updated_at: string
+}
+
+/** The price book a tender is pinned to. */
+export interface TenderDataset {
+  id: string
+  name: string
+  region: string
+  region_label: string
+  country: string
+  location: string
+  source_kind: string
+  source_files: string[]
+  notes: string
+  immutable: boolean
+  derived: boolean
+  version: number
+  latest_version: number
+  pinned_at: string
+  version_note: string
+  missing?: boolean
+}
+
+export interface ConfidenceBucket {
+  key: 'firm' | 'assumption' | 'quote' | 'labour_only' | 'open'
+  label: string
+  positions: number
+  value_chf: number
+  share_pct: number
+  lv_ids: string[]
+}
+
+export interface Confidence {
+  buckets: ConfidenceBucket[]
+  position_value_chf: number
+  firm_share_pct: number
+  unpriced: {
+    estimated_positions: number
+    estimated_material_chf: number
+    no_basis_positions: number
+    no_basis_labour_chf: number
+    lv_ids_estimated: string[]
+    lv_ids_no_basis: string[]
+  }
+}
+
+export interface ValidationField {
+  field: string
+  label: string
+  kind: 'text' | 'number' | 'chf' | 'hours'
+  expected: string | number | boolean | null
+  actual: string | number | boolean | null
+  match: boolean
+}
+
+export interface ValidationPosition {
+  /** The id Equans uses in the reference files, e.g. LV0001. */
+  lv_id: string
+  /** The position our extraction produced for it, e.g. X0009. */
+  our_lv_id: string | null
+  /** Our tender reference for the position paired with this expectation. */
+  our_ref: string | null
+  found: boolean
+  match: boolean
+  description: string
+  source_page: number
+  system: string
+  category: string
+  title: string | null
+  variant?: string
+  overridden: string[]
+  /** Set when a supplier quote explains the difference from the reference. */
+  quote: Quote | null
+  explained?: boolean
+  mismatches: string[]
+  fields: ValidationField[]
+}
+
+export interface Validation {
+  source: string
+  positions: ValidationPosition[]
+  totals: { label: string; expected: number; actual: number; match: boolean }[]
+  scenarios: {
+    scenario: string
+    margin_pct: number
+    expected_bid_chf: number | null
+    actual_bid_chf: number
+    expected_win_probability: number | null
+    actual_win_probability: number
+    match: boolean
+  }[]
+  summary: {
+    total: number
+    exact: number
+    found: number
+    edited: number
+    unexplained: number
+    totals_match: boolean
+    scenarios_match: boolean
+    passed: boolean
+  }
 }

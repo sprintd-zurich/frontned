@@ -221,7 +221,7 @@ function Dashboard() {
   const ready = m.open === 0
   const status: [string, number, string, () => void][] = [
     ['Approved', m.approved, '#009b7d', () => go('approved', '/positions')],
-    ['Needs review', m.decision, '#ff7929', () => go('decision', '/review')],
+    ['Needs review', m.decision, '#ff7929', () => go('decision', '/matched')],
     ['Open', m.open - m.decision, '#a7afbd', () => go('all', '/positions')],
   ]
   function go(pill: Pill, url: string) {
@@ -299,7 +299,7 @@ function Dashboard() {
           <button
             className="metric card"
             key={label}
-            onClick={() => (pill === 'value' ? navigate('/bid') : go(pill, pill === 'decision' ? '/review' : '/positions'))}
+            onClick={() => (pill === 'value' ? navigate('/bid') : go(pill, pill === 'decision' ? '/matched' : '/positions'))}
           >
             <span className={`metric-icon ${color}`}>
               <I />

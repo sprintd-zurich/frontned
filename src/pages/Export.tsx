@@ -29,7 +29,7 @@ export function Export() {
                 title="Open these items in Review"
                 onClick={() => {
                   filter({ only: { label: 'Review pending', ids: pending.map((p) => p.lv_id) }, pill: 'all', category: 'all', system: 'all', search: '' })
-                  navigate('/review')
+                  navigate('/matched')
                 }}
               >
                 <AlertTriangle size={16} /> Review pending · {pending.length}

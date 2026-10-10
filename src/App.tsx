@@ -5,8 +5,10 @@ import { initials } from './derive'
 import { useStore } from './store'
 import { Button, Modal } from './components/ui'
 import { Overview, ProjectsSidebar } from './pages/Overview'
-import { Workspace } from './pages/Workspace'
-import { FaceToFace } from './pages/FaceToFace'
+import { StructuredItems } from './pages/StructuredItems'
+import { MatchedItems } from './pages/MatchedItems'
+import { DirectCostsCalculation } from './pages/DirectCostsCalculation'
+import { Validation } from './pages/Validation'
 import { Bid } from './pages/Bid'
 import { Export } from './pages/Export'
 import { Supplier } from './pages/Supplier'
@@ -15,10 +17,12 @@ import { MetaForm } from './pages/MetaForm'
 
 const WORK = [
   ['/positions', 'Items'],
-  ['/review', 'Review'],
+  ['/matched', 'Product Matching'],
   ['/supplier', 'Supplier'],
+  ['/calculation', 'Calculation'],
   ['/experience', 'Experience'],
   ['/bid', 'Bid'],
+  ['/validation', 'Validation'],
   ['/export', 'Export'],
 ] as const
 
@@ -68,7 +72,7 @@ export default function App() {
             disabled={!estimate}
             onChange={(e) => {
               filter({ search: e.target.value })
-              if (['/', '/export', '/bid', '/supplier', '/experience'].includes(page)) navigate('/positions')
+              if (!['/positions', '/matched', '/calculation'].includes(page)) navigate('/positions')
             }}
           />
         </label>
@@ -90,7 +94,7 @@ export default function App() {
       )}
       <div className={`app ${overview ? 'dashboard-shell' : 'workspace-shell'}`}>
         {overview && <ProjectsSidebar />}
-        <main className={overview ? 'dashboard-main' : `workspace-main ${['/bid', '/export', '/experience'].includes(page) ? '' : 'split'}`}>
+        <main className={overview ? 'dashboard-main' : `workspace-main ${page === '/supplier' ? 'split' : ''}`}>
           {overview ? (
             ready || estimate ? <Overview /> : <div className="loading-state"><span className="spinner" /> Connecting to the pricing API…</div>
           ) : page === '/systems' ? (
@@ -103,12 +107,14 @@ export default function App() {
             <Supplier />
           ) : page === '/experience' ? (
             <Experience />
-          ) : page === '/review' ? (
-            <Workspace />
+          ) : page === '/matched' || page === '/review' ? (
+            <MatchedItems />
           ) : page === '/calculation' ? (
-            <Navigate to="/review" replace />
+            <DirectCostsCalculation />
+          ) : page === '/validation' ? (
+            <Validation />
           ) : (
-            <FaceToFace />
+            <StructuredItems />
           )}
         </main>
       </div>
@@ -132,21 +138,23 @@ export default function App() {
         <Modal title="From tender to a first price you can defend" close={() => setModal('')}>
           <p>Import the tender PDF. Every step below works on the real extraction and prices.</p>
           <ol className="guide">
-            <li>Items: every LV line as read from the tender, next to the tender page with its source highlighted. Click a line in the tender to find its item.</li>
-            <li>Review: each position matched against the company database and its prices. Where data is missing, review it, add the information or request a supplier quote, then approve.</li>
-            <li>Supplier: tick the items still missing a price, prepare the request mail and read prices from the product sheets suppliers send back.</li>
+            <li>Items: every LV line as read from the tender, next to the tender page with its source highlighted.</li>
+            <li>Product Matching: each position matched against the price book. Where data is missing, pick a product, add the information or request a supplier quote.</li>
+            <li>Supplier: tick the items still missing a price and prepare the request mail.</li>
+            <li>Calculation: material and labour for every position, with material inflation.</li>
             <li>Experience: opinions, estimates and files from the team, kept with the tender for later bid adjustments.</li>
             <li>Bid: cost per system, the calculated price, then margins, win probability and saved scenarios.</li>
+            <li>Validation: the 22 Equans reference positions compared number by number with what was calculated.</li>
             <li>Export: the positions next to the priced tender PDF and the offer workbook.</li>
           </ol>
           <Button
             primary
             onClick={() => {
               setModal('')
-              navigate(estimate ? '/review' : '/')
+              navigate(estimate ? '/matched' : '/')
             }}
           >
-            {estimate ? 'Open the review queue' : 'Import a tender'} <ArrowRight size={16} />
+            {estimate ? 'Open Product Matching' : 'Import a tender'} <ArrowRight size={16} />
           </Button>
         </Modal>
       )}

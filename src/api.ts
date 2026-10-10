@@ -1,5 +1,10 @@
 import type {
   CatalogItem,
+  Dataset,
+  MaterialInflation,
+  NewQuote,
+  Status,
+  Validation,
   Estimate,
   Meta,
   Parameters,
@@ -12,6 +17,19 @@ import type {
   SourceLocation,
   TenderSummary,
 } from './types'
+
+export interface DatasetImport {
+  name: string
+  country: string
+  location: string
+  region: string
+  currency: string
+  note?: string
+  base_dataset: string
+  catalog: File
+  productivity: File
+  parameters?: File | null
+}
 
 const BASE = import.meta.env.VITE_API_URL ?? ''
 
@@ -121,4 +139,66 @@ export const api = {
     call<Estimate>(`/api/tenders/${id}/experience/suggest/apply`, { method: 'DELETE' }),
   suggestBid: (id: string) => call<Estimate>(`/api/tenders/${id}/experience/suggest`, { method: 'POST' }),
   experienceFileUrl: (id: string, eid: string) => `${BASE}/api/tenders/${id}/experience/${eid}/file`,
+  archive: (id: string, archived: boolean) =>
+    call<{ ok: boolean; archived: boolean }>(`/api/tenders/${id}/archive`, json('PATCH', { archived })),
+  bulk: (id: string, body: { lv_ids: string[]; reviewed?: boolean; status?: Status }) =>
+    call<Estimate>(`/api/tenders/${id}/positions/bulk`, json('POST', body)),
+  setMaterialInflation: (id: string, body: MaterialInflation) =>
+    call<Estimate>(`/api/tenders/${id}/material-inflation`, json('PATCH', body)),
+  validation: (id: string) => call<Validation>(`/api/tenders/${id}/validation`),
+
+  // price books
+  datasets: () => call<Dataset[]>('/api/datasets'),
+  dataset: (did: string) => call<Dataset & { catalog: CatalogItem[] }>(`/api/datasets/${did}`),
+  createDataset: (body: {
+    name: string
+    clone_of?: string
+    region?: string
+    region_label?: string
+    country?: string
+    location?: string
+    material_factor_pct?: number
+    labour_factor_pct?: number
+  }) => call<Dataset>('/api/datasets', json('POST', body)),
+  importDataset: (body: DatasetImport) => {
+    const form = new FormData()
+    form.append('name', body.name)
+    form.append('country', body.country)
+    form.append('location', body.location)
+    form.append('region', body.region)
+    form.append('currency', body.currency)
+    form.append('note', body.note ?? '')
+    form.append('base_dataset', body.base_dataset)
+    form.append('catalog', body.catalog)
+    form.append('productivity', body.productivity)
+    if (body.parameters) form.append('parameters', body.parameters)
+    return call<Dataset>('/api/datasets/import', { method: 'POST', body: form })
+  },
+  deleteDataset: (did: string) => call<{ ok: boolean }>(`/api/datasets/${did}`, { method: 'DELETE' }),
+  setDataset: (id: string, body: { id: string; version?: number }) =>
+    call<Estimate>(`/api/tenders/${id}/dataset`, json('PATCH', body)),
+
+  // supplier quotes on a tender
+  addQuote: (id: string, body: NewQuote) => call<Estimate>(`/api/tenders/${id}/quotes`, json('POST', body)),
+  importQuoteWorkbook: (id: string, file: File, supplier: string, reference: string, quotedAt: string) => {
+    const form = new FormData()
+    form.append('file', file)
+    form.append('supplier', supplier)
+    form.append('reference', reference)
+    form.append('quoted_at', quotedAt)
+    return call<Estimate>(`/api/tenders/${id}/quotes/import`, { method: 'POST', body: form })
+  },
+  importQuoteCsv: (id: string, file: File, supplier: string, reference: string, quotedAt: string) => {
+    const form = new FormData()
+    form.append('file', file)
+    form.append('supplier', supplier)
+    form.append('reference', reference)
+    form.append('quoted_at', quotedAt)
+    return call<Estimate>(`/api/tenders/${id}/quotes/import-csv`, { method: 'POST', body: form })
+  },
+  quoteRequestCsvUrl: (id: string, lvIds: string[]) =>
+    `${BASE}/api/tenders/${id}/quotes/request.csv?lv_ids=${encodeURIComponent(lvIds.join(','))}`,
+  deleteQuote: (id: string, qid: string) => call<Estimate>(`/api/tenders/${id}/quotes/${qid}`, { method: 'DELETE' }),
+  promoteQuote: (id: string, qid: string, datasetId: string) =>
+    call<Estimate>(`/api/tenders/${id}/quotes/${qid}/promote`, json('POST', { dataset_id: datasetId })),
 }

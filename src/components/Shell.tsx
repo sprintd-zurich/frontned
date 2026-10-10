@@ -72,7 +72,7 @@ export function CategoryStrip() {
         <Layers size={13} /> All <span>{e.positions.length}</span>
       </button>
       {e.categories.map((c) => {
-        const n = e.positions.filter((p) => p.category === c.id).length
+        const n = e.positions.filter((p) => p.trade === c.id).length
         return (
           <button
             key={c.id}
@@ -80,7 +80,7 @@ export function CategoryStrip() {
             className={`category-chip ${category === c.id ? 'selected' : ''}`}
             style={{ '--cat': c.color } as CSSProperties}
             onClick={() => filter({ category: category === c.id ? 'all' : c.id })}
-            title={n ? `${n} positions, CHF ${money(sum(e.positions.filter((p) => p.category === c.id)))} direct cost` : 'Not in this tender'}
+            title={n ? `${n} positions, CHF ${money(sum(e.positions.filter((p) => p.trade === c.id)))} direct cost` : 'Not in this tender'}
           >
             {c.label} <span>{n}</span>
           </button>

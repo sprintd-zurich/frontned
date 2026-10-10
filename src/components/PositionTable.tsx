@@ -19,7 +19,7 @@ function baseFilter(ps: Position[], s: ReturnType<typeof useStore.getState>, rev
       (!review || s.pill === 'approved' || isBlocker(p)) &&
       (!s.only || s.only.ids.includes(p.lv_id)) &&
       (s.system === 'all' || p.system === s.system) &&
-      (s.category === 'all' || p.category === s.category) &&
+      (s.category === 'all' || p.trade === s.category) &&
       (s.section === 'all' || p.section === s.section) &&
       (!s.hideDucts || !isDuctList(p)) &&
       (!q ||
@@ -221,7 +221,7 @@ export function PositionTable({ rows, mode = 'positions', limit = 8 }: { rows: P
           </thead>
           <tbody ref={body}>
             {visible.map((p) => {
-              const c = cats[p.category]
+              const c = cats[p.trade]
               return (
                 <tr
                   tabIndex={0}
@@ -311,7 +311,7 @@ export function PositionTable({ rows, mode = 'positions', limit = 8 }: { rows: P
                             onClick={(ev) => {
                               ev.stopPropagation()
                               select(p.lv_id)
-                              navigate('/review')
+                              navigate('/matched')
                             }}
                           >
                             Review
