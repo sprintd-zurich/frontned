@@ -46,6 +46,21 @@ interface State extends Filters {
   saveSnapshot: (name: string) => Promise<void>
   applySnapshot: (sid: string) => Promise<void>
   deleteSnapshot: (sid: string) => Promise<void>
+  /** any change that returns the estimate (sheets, experience, …) */
+  act: (label: string, fn: (tid: string) => Promise<Estimate>, done?: string) => Promise<boolean>
+  /** share of the window the left side of the split views takes (0.2–0.8) */
+  ratio: number
+  setRatio: (r: number) => void
+}
+
+const RATIO = 'equans-split-ratio'
+function savedRatio() {
+  try {
+    const r = Number(localStorage.getItem(RATIO))
+    return r >= 0.2 && r <= 0.8 ? r : 0.5
+  } catch {
+    return 0.5
+  }
 }
 
 const NO_FILTERS: Filters = { system: 'all', category: 'all', pill: 'all', search: '', section: 'all', hideDucts: false, only: null }
@@ -97,6 +112,17 @@ export const useStore = create<State>((set, get) => {
     error: null,
     toast: '',
     ready: false,
+    ratio: savedRatio(),
+    setRatio: (r) => {
+      const ratio = Math.min(0.8, Math.max(0.2, r))
+      set({ ratio })
+      try {
+        localStorage.setItem(RATIO, String(ratio))
+      } catch {
+        /* the ratio then lasts for this visit */
+      }
+    },
+    act: (label, fn, done) => run(label, () => fn(tid()), done),
     filter: (f) => set(f),
     clearFilters: () => set(NO_FILTERS),
     select: (selected) => set({ selected }),

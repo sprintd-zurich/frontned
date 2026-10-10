@@ -51,6 +51,10 @@ export interface Position {
   reviewed: boolean
   notes: Note[]
   alternatives: Alternative[]
+  /** product sheet the unit price was taken from */
+  price_sheet: string | null
+  /** product sheets linked to this position */
+  sheets: string[]
 }
 
 export type TraceField =
@@ -63,9 +67,78 @@ export type TraceField =
   | 'labour_cost_chf'
   | 'direct_position_cost_chf'
 
+export interface TraceLink {
+  label: string
+  /** API path of the file, with #page=N for a PDF page */
+  href: string
+  kind: 'tender' | 'company' | 'sheet'
+  page?: number | null
+  row?: number | null
+}
+
 export interface Trace {
   source: string
   lines: string[]
+  links?: TraceLink[]
+}
+
+export interface Found {
+  value: string | number
+  page: number
+  line: string
+}
+
+export interface SheetPrice {
+  value: number
+  kind: 'net' | 'list' | 'price'
+  page: number
+  line: string
+}
+
+/** A supplier product sheet or quote, stored with the tender and read for prices and product data. */
+export interface Sheet {
+  id: string
+  name: string
+  file: string
+  supplier: string
+  lv_ids: string[]
+  at: string
+  found: {
+    pages: number
+    readable: boolean
+    prices: SheetPrice[]
+    discount: Found | null
+    manufacturer: string | null
+    type: Found | null
+    article: Found | null
+    lead_time: Found | null
+    valid_until: Found | null
+  }
+}
+
+export interface Experience {
+  id: string
+  at: string
+  kind: 'opinion' | 'estimate' | 'file'
+  text: string
+  scope: 'project' | 'system' | 'category' | 'position'
+  ref: string
+  adjustment_pct: number | null
+  author: string | null
+  file: { name: string; stored: string } | null
+}
+
+export interface SupplierItem {
+  lv_id: string
+  package: string
+  package_title: string
+}
+
+export interface SupplierDraft {
+  subject: string
+  text: string
+  pages: number[]
+  lines: { lv_id: string; system: string; text: string; quantity: number | null; unit: string; source_page: number }[]
 }
 
 export interface Category {
@@ -83,7 +156,7 @@ export interface Note {
 
 export interface Activity {
   at: string
-  kind: 'import' | 'change' | 'review' | 'note' | 'export' | 'scenario' | 'meta'
+  kind: 'import' | 'change' | 'review' | 'note' | 'export' | 'scenario' | 'meta' | 'sheet' | 'experience'
   text: string
   lv_id: string | null
 }
@@ -227,6 +300,8 @@ export interface Estimate {
   snapshots: Snapshot[]
   checks: DesignCheck[]
   activity: Activity[]
+  sheets: Sheet[]
+  experience: Experience[]
 }
 
 export interface CatalogItem {
@@ -252,6 +327,8 @@ export interface PositionOverride {
   base_hours_per_unit?: number
   hourly_rate_chf?: number
   status?: Status
+  price_sheet?: string
+  price_page?: number
   reviewed?: boolean
   reset?: boolean
 }

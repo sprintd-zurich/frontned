@@ -2,28 +2,9 @@ import type { CSSProperties } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Calculator, Check, FileText, Layers, Link2, Eye, Upload } from 'lucide-react'
 import { metrics, workflow } from '../derive'
-import { fmtDate, money } from '../format'
+import { money } from '../format'
 import { useEstimate, useStore } from '../store'
 import { Ring } from './ui'
-
-export function ProjectCard() {
-  const e = useEstimate()
-  const m = e.tender.meta
-  return (
-    <section className="project-card card">
-      <img src="/project-building.jpg" alt="" />
-      <div>
-        <h3>{m.project_name || e.tender.name}</h3>
-        <p>{m.location || m.client || '—'}</p>
-        <small>
-          {m.trade || 'Tender'} <span className="separator">|</span>{' '}
-          {m.submission_date ? `Submission ${fmtDate(m.submission_date)}` : `Tender of ${m.document_date || fmtDate(e.tender.created_at)}`}
-        </small>
-        <small>Estimator: {m.estimator || 'not set'}</small>
-      </div>
-    </section>
-  )
-}
 
 const STEP_STYLE = {
   extract: [FileText, '#062969'],
@@ -34,21 +15,24 @@ const STEP_STYLE = {
   export: [Upload, '#7b61ff'],
 } as const
 
-export function Workflow() {
+/** The workflow steps as progress circles; on the project overview, under the project's own completion bar. */
+export function Workflow({ stepsOnly = false }: { stepsOnly?: boolean }) {
   const e = useEstimate()
   const m = metrics(e.positions)
   const navigate = useNavigate()
   return (
-    <section className="workflow card">
-      <div className="completion">
-        <Ring value={m.percent} />
-        <div>
-          <h2>Tender completion</h2>
-          <p>
-            {m.approved} of {m.priceable} priced positions approved
-          </p>
+    <section className={`workflow ${stepsOnly ? 'steps-only' : 'card'}`}>
+      {!stepsOnly && (
+        <div className="completion">
+          <Ring value={m.percent} />
+          <div>
+            <h2>Tender completion</h2>
+            <p>
+              {m.approved} of {m.priceable} priced positions approved
+            </p>
+          </div>
         </div>
-      </div>
+      )}
       <div className="workflow-steps">
         {workflow(e).map((s) => {
           const [Icon, color] = STEP_STYLE[s.key as keyof typeof STEP_STYLE]

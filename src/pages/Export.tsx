@@ -1,11 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { AlertTriangle, CheckCircle2, ChevronRight, Clock3, Copy, Download, Eye, FileSpreadsheet, FileText, Send } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, ChevronRight, Clock3, Download, Eye, FileSpreadsheet } from 'lucide-react'
 import { api } from '../api'
 import { isBlocker, lastOf, metrics, needsDecision, positionLabel, workflow } from '../derive'
-import { fmtChf, fmtNum, money, unit } from '../format'
+import { fmtChf } from '../format'
 import { useEstimate, useStore } from '../store'
-import type { RfqPackage } from '../types'
 import { PreviewModal, type PreviewKind } from '../components/PreviewModal'
 import { Button, Ring, StatusBadge } from '../components/ui'
 import { FaceToFace } from './FaceToFace'
@@ -20,7 +19,7 @@ export function Export() {
   const steps = workflow(e)
   const blockers = e.positions.filter(isBlocker).sort((a, b) => Number(needsDecision(b)) - Number(needsDecision(a)))
   const warnings = e.checks.filter((c) => c.level === 'warning').length
-  const rfqSent = !!lastOf(e.activity, ['export']) && e.activity.some((a) => a.kind === 'export' && a.text.startsWith('RFQ'))
+  const rfqSent = !!lastOf(e.activity, ['export']) && e.activity.some((a) => a.kind === 'export' && (a.text.startsWith('RFQ') || a.text.startsWith('Supplier item list')))
   const checklist: [string, boolean, string][] = [
     ['Positions extracted from the tender', true, `${m.total} positions`],
     ['Every position matched', steps[1].value === 100, `${steps[1].value}%`],
@@ -139,7 +138,18 @@ export function Export() {
           <Doc icon="PDF" title="Original tender" sub={`${e.tender.name} · ${e.tender.pages} pages`} href={api.tenderPdfUrl(e.tender.id)} open />
         </div>
       </section>
-      <Rfqs />
+      <section className="card export-supplier">
+        <div>
+          <h2>Supplier requests</h2>
+          <p className="muted">
+            {m.quote ? `${m.quote} positions still wait for a supplier price.` : 'No position waits for a supplier price.'} Requests, mails
+            and product sheets are prepared on the Supplier tab.
+          </p>
+        </div>
+        <Button onClick={() => navigate('/supplier')}>
+          Open Supplier <ChevronRight size={16} />
+        </Button>
+      </section>
       {preview && <PreviewModal kind={preview} tenderId={e.tender.id} onClose={() => setPreview(null)} />}
     </div>
   )
@@ -164,120 +174,5 @@ function Doc({ icon, title, sub, onPreview, href, open = false }: { icon: string
         </a>
       </div>
     </div>
-  )
-}
-
-function Rfqs() {
-  const e = useEstimate()
-  const [rfqs, setRfqs] = useState<RfqPackage[] | null>(null)
-  const [open, setOpen] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const notify = useStore((s) => s.notify)
-  // refetch whenever the estimate changes, so position edits show up here
-  useEffect(() => {
-    api
-      .rfqs(e.tender.id)
-      .then((r) => {
-        setRfqs(r)
-        setOpen((o) => (o && r.some((x) => x.key === o) ? o : (r[0]?.key ?? null)))
-      })
-      .catch((err) => setError(err.message))
-  }, [e])
-  const current = rfqs?.find((r) => r.key === open)
-  return (
-    <section className="card rfq-card">
-      <div className="section-heading">
-        <div>
-          <h2>Supplier RFQs</h2>
-          <p className="muted">
-            Every position with status Supplier quote is in exactly one request. Budgets are our internal benchmark and are not part
-            of the request text.
-          </p>
-        </div>
-        {rfqs && <span className="count-badge">{rfqs.reduce((s, r) => s + r.positions, 0)}</span>}
-      </div>
-      {error && <div className="notice">{error}</div>}
-      {!rfqs && !error && (
-        <div className="loading-state">
-          <span className="spinner" /> Preparing requests…
-        </div>
-      )}
-      {rfqs && !rfqs.length && <p className="muted">No position waits for a supplier price.</p>}
-      {rfqs && rfqs.length > 0 && (
-        <div className="rfq-layout">
-          <div className="rfq-list">
-            {rfqs.map((r) => (
-              <button key={r.key} className={r.key === current?.key ? 'active' : ''} onClick={() => setOpen(r.key)}>
-                <strong>{r.title}</strong>
-                <small>
-                  {r.positions} pos.{r.unpriced ? ` · ${r.unpriced} unpriced` : ''} · budget {r.budget_chf ? `CHF ${money(r.budget_chf)}` : '—'}
-                </small>
-              </button>
-            ))}
-          </div>
-          {current && (
-            <div className="rfq-detail">
-              <div className="section-heading">
-                <div>
-                  <h3>{current.title}</h3>
-                  <small className="muted">
-                    Internal budget {current.budget_chf ? fmtChf(current.budget_chf) : 'none yet'} · PDF pages {current.pages.join(', ')}
-                  </small>
-                </div>
-                <div className="inline">
-                  <Button
-                    className="small"
-                    onClick={async () => {
-                      try {
-                        await navigator.clipboard.writeText(current.text)
-                        notify('Request text copied.')
-                      } catch {
-                        notify('Select the request text below and copy it.')
-                      }
-                    }}
-                  >
-                    <Copy size={14} /> Copy request
-                  </Button>
-                  <a className="button small primary" href={api.rfqUrl(e.tender.id, current.key)} download>
-                    <Download size={14} /> Item list (Excel)
-                  </a>
-                </div>
-              </div>
-              <div className="table-scroll">
-                <table className="position-table">
-                  <thead>
-                    <tr>
-                      <th>Item</th>
-                      <th className="num">Qty</th>
-                      <th>Unit</th>
-                      <th>System</th>
-                      <th>Page</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {current.lines.map((l) => (
-                      <tr key={l.lv_id}>
-                        <td className="description-cell">{l.text}</td>
-                        <td className="num">{fmtNum(l.quantity)}</td>
-                        <td>{unit(l.unit)}</td>
-                        <td>{l.system}</td>
-                        <td>p. {l.source_page}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <h4 className="rfq-text-title">
-                <Send size={13} /> Request text (German, for the supplier)
-              </h4>
-              <pre className="rfq-text">{current.text}</pre>
-            </div>
-          )}
-        </div>
-      )}
-      <small className="muted">
-        <FileText size={12} /> Downloads are recorded in the activity journal.
-      </small>
-    </section>
   )
 }

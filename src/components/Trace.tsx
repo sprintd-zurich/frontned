@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { Link2 } from 'lucide-react'
-import type { Trace } from '../types'
+import { ExternalLink, Link2 } from 'lucide-react'
+import { api } from '../api'
+import type { Trace, TraceLink } from '../types'
 
 /** A number with its source: a click shows where it comes from (tender, company catalogue, rule, parameter or an edit). */
 export function Traced({ trace, children, className = '' }: { trace?: Trace; children: ReactNode; className?: string }) {
@@ -34,8 +35,9 @@ export function Traced({ trace, children, className = '' }: { trace?: Trace; chi
         onClick={(ev) => {
           ev.stopPropagation()
           const r = ev.currentTarget.getBoundingClientRect()
-          const below = r.bottom + 180 < window.innerHeight
-          setOpen(open ? null : { top: below ? r.bottom + 6 : Math.max(8, r.top - 186), left: Math.max(8, Math.min(r.left, window.innerWidth - 396)) })
+          const h = 190 + (trace.links?.length ?? 0) * 22
+          const below = r.bottom + h < window.innerHeight
+          setOpen(open ? null : { top: below ? r.bottom + 6 : Math.max(8, r.top - h - 6), left: Math.max(8, Math.min(r.left, window.innerWidth - 396)) })
         }}
       >
         {children}
@@ -48,6 +50,13 @@ export function Traced({ trace, children, className = '' }: { trace?: Trace; chi
           {trace.lines.map((l, i) => (
             <span key={i}>{l}</span>
           ))}
+          {!!trace.links?.length && (
+            <span className="trace-links">
+              {trace.links.map((l) => (
+                <FileLink key={l.href} link={l} />
+              ))}
+            </span>
+          )}
         </span>
       )}
     </span>
@@ -61,5 +70,14 @@ export function SourceLine({ trace }: { trace?: Trace }) {
     <Traced trace={trace} className="source-line">
       <Link2 size={11} /> {trace.source}
     </Traced>
+  )
+}
+
+/** The file a number was read from, opened at its page (PDF) or row (company data). */
+export function FileLink({ link }: { link: TraceLink }) {
+  return (
+    <a className="file-link" href={api.href(link.href)} target="_blank" rel="noreferrer" onMouseDown={(ev) => ev.stopPropagation()}>
+      <ExternalLink size={11} /> {link.label}
+    </a>
   )
 }

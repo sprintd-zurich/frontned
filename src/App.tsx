@@ -4,17 +4,21 @@ import { AlertTriangle, ArrowRight, CheckCircle2, HelpCircle, Search, X } from '
 import { initials } from './derive'
 import { useStore } from './store'
 import { Button, Modal } from './components/ui'
-import { CategoryStrip, ProjectCard, Workflow } from './components/Shell'
+import { CategoryStrip } from './components/Shell'
 import { Overview, ProjectsSidebar } from './pages/Overview'
 import { Workspace } from './pages/Workspace'
 import { FaceToFace } from './pages/FaceToFace'
 import { Bid } from './pages/Bid'
 import { Export } from './pages/Export'
+import { Supplier } from './pages/Supplier'
+import { Experience } from './pages/Experience'
 import { MetaForm } from './pages/MetaForm'
 
 const WORK = [
   ['/positions', 'Positions'],
   ['/review', 'Review'],
+  ['/supplier', 'Supplier'],
+  ['/experience', 'Experience'],
   ['/bid', 'Bid'],
   ['/export', 'Export'],
 ] as const
@@ -65,7 +69,7 @@ export default function App() {
             disabled={!estimate}
             onChange={(e) => {
               filter({ search: e.target.value })
-              if (['/', '/export', '/bid'].includes(page)) navigate('/positions')
+              if (['/', '/export', '/bid', '/supplier', '/experience'].includes(page)) navigate('/positions')
             }}
           />
         </label>
@@ -89,15 +93,9 @@ export default function App() {
         {overview ? (
           <ProjectsSidebar />
         ) : (
-          <>
-            <div className="workspace-top">
-              <ProjectCard />
-              <Workflow />
-            </div>
-            <CategoryStrip />
-          </>
+          <CategoryStrip />
         )}
-        <main className={overview ? 'dashboard-main' : `workspace-main ${['/bid', '/export'].includes(page) ? '' : 'split'}`}>
+        <main className={overview ? 'dashboard-main' : `workspace-main ${['/bid', '/export', '/experience'].includes(page) ? '' : 'split'}`}>
           {overview ? (
             ready || estimate ? <Overview /> : <div className="loading-state"><span className="spinner" /> Connecting to the pricing API…</div>
           ) : page === '/systems' ? (
@@ -106,6 +104,10 @@ export default function App() {
             <Bid />
           ) : page === '/export' ? (
             <Export />
+          ) : page === '/supplier' ? (
+            <Supplier />
+          ) : page === '/experience' ? (
+            <Experience />
           ) : page === '/review' ? (
             <Workspace />
           ) : page === '/calculation' ? (
@@ -137,8 +139,10 @@ export default function App() {
           <ol className="guide">
             <li>Positions: every LV line as read from the tender, next to the tender page with its source highlighted.</li>
             <li>Review: each position matched against the company database and its prices. Where data is missing, review it, add the information or request a supplier quote, then approve.</li>
+            <li>Supplier: tick the items still missing a price, prepare the request mail and read prices from the product sheets suppliers send back.</li>
+            <li>Experience: opinions, estimates and files from the team, kept with the tender for later bid adjustments.</li>
             <li>Bid: cost per system, the calculated price, then margins, win probability and saved scenarios.</li>
-            <li>Export: the positions next to the priced tender PDF, the offer workbook and supplier RFQs.</li>
+            <li>Export: the positions next to the priced tender PDF and the offer workbook.</li>
           </ol>
           <Button
             primary

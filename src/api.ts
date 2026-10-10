@@ -5,6 +5,8 @@ import type {
   Parameters,
   PositionOverride,
   RfqPackage,
+  SupplierDraft,
+  SupplierItem,
   SourceLocation,
   TenderSummary,
 } from './types'
@@ -72,4 +74,31 @@ export const api = {
   catalog: () => call<CatalogItem[]>('/api/reference/catalog'),
   productivity: () => call<ProductivityRule[]>('/api/reference/productivity'),
   pageUrl: (id: string, page: number) => `${BASE}/api/tenders/${id}/pages/${page}.png`,
+  /** a path the backend returned (trace links, files) as a full URL */
+  href: (path: string) => `${BASE}${path}`,
+  supplierItems: (id: string) => call<SupplierItem[]>(`/api/tenders/${id}/supplier/items`),
+  supplierDraft: (id: string, lv_ids: string[], supplier: string, contact: string) =>
+    call<SupplierDraft>(`/api/tenders/${id}/supplier/draft`, json('POST', { lv_ids, supplier, contact })),
+  supplierDraftUrl: (id: string, lvIds: string[], supplier: string) =>
+    `${BASE}/api/tenders/${id}/supplier/draft.xlsx?lv_ids=${lvIds.join(',')}&supplier=${encodeURIComponent(supplier)}`,
+  uploadSheet: (id: string, file: File, lvIds: string[], supplier: string) => {
+    const form = new FormData()
+    form.append('file', file)
+    form.append('lv_ids', lvIds.join(','))
+    form.append('supplier', supplier)
+    return call<Estimate>(`/api/tenders/${id}/sheets`, { method: 'POST', body: form })
+  },
+  linkSheet: (id: string, sid: string, body: { lv_ids?: string[]; supplier?: string }) =>
+    call<Estimate>(`/api/tenders/${id}/sheets/${sid}`, json('PATCH', body)),
+  deleteSheet: (id: string, sid: string) => call<Estimate>(`/api/tenders/${id}/sheets/${sid}`, { method: 'DELETE' }),
+  sheetUrl: (id: string, sid: string, page?: number | null) =>
+    `${BASE}/api/tenders/${id}/sheets/${sid}/file${page ? `#page=${page}` : ''}`,
+  addExperience: (id: string, entry: Record<string, string>, file?: File | null) => {
+    const form = new FormData()
+    Object.entries(entry).forEach(([k, v]) => v !== '' && form.append(k, v))
+    if (file) form.append('file', file)
+    return call<Estimate>(`/api/tenders/${id}/experience`, { method: 'POST', body: form })
+  },
+  deleteExperience: (id: string, eid: string) => call<Estimate>(`/api/tenders/${id}/experience/${eid}`, { method: 'DELETE' }),
+  experienceFileUrl: (id: string, eid: string) => `${BASE}/api/tenders/${id}/experience/${eid}/file`,
 }
