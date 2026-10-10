@@ -207,3 +207,4 @@ details { margin-top: 8px; font-size: 13px; }
   .steps { grid-template-columns: repeat(2, 1fr); }
   .param-grid { grid-template-columns: 1fr 1fr; }
 }
+.warn-note { color: var(--warn); background: var(--warn-bg); padding: 8px 10px; border-radius: 6px; margin: 8px 0 0; }

@@ -27,7 +27,7 @@ export const STATUS_META: Record<Status, { label: string; tone: string; help: st
     help: 'The tender does not give enough information (e.g. blank quantity).',
   },
   out_of_scope: { label: 'Out of scope', tone: 'muted', help: 'Excluded from this offer.' },
-  non_priceable: { label: 'Not priceable', tone: 'muted', help: 'Summary or text line; covered elsewhere.' },
+  non_priceable: { label: 'Not priced separately', tone: 'muted', help: 'Summary line, or work already in a project cost line (see the note on the position).' },
 }
 
 export const STATUS_ORDER: Status[] = [
