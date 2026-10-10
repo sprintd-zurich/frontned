@@ -22,17 +22,6 @@ export function systemsOf(positions: Position[]): SystemInfo[] {
 export const isPriceable = (p: Position) => p.status !== 'non_priceable' && p.status !== 'out_of_scope'
 export const needsDecision = (p: Position) =>
   !p.reviewed && (p.status === 'review_required' || p.status === 'insufficient_information')
-/** How the position was matched against the company data (catalogue, supplier packages, productivity rules). */
-export const MATCH_LABEL: Record<string, string> = {
-  exact: 'Exact catalogue item',
-  supplier: 'Supplier package',
-  nearest: 'Nearest catalogue item',
-  labour_only: 'Labour only (installation rule)',
-  unknown: 'No match in the company data',
-}
-/** The company data covers the position: a quantity, a catalogue item or rule, and no open decision. */
-export const hasCompanyData = (p: Position) =>
-  !needsDecision(p) && p.quantity != null && p.match_kind !== 'unknown' && (!!p.product_id || (!!p.install_code && p.install_code !== 'UNKNOWN'))
 /** Everything an estimator still has to sign off before the offer goes out. */
 export const isBlocker = (p: Position) => isPriceable(p) && !p.reviewed
 export const isDuctList = (p: Position) => p.kind.startsWith('duct') || p.kind.startsWith('fitting')
@@ -96,12 +85,12 @@ export function workflow(e: Estimate) {
   const lastChange = lastOf(e.activity, ['change', 'review', 'scenario'])
   const exported = !!lastExport && (!lastChange || lastExport.at >= lastChange.at)
   return [
-    { key: 'extract', label: 'Extract', value: share((p) => p.quantity != null), url: '/positions' },
-    { key: 'match', label: 'Match', value: share((p) => p.match_kind !== 'unknown'), url: '/review' },
-    { key: 'calculate', label: 'Calculate', value: share((p) => p.direct_position_cost_chf > 0), url: '/review' },
-    { key: 'review', label: 'Review', value: share((p) => !needsDecision(p)), url: '/review' },
-    { key: 'approve', label: 'Approve', value: share((p) => p.reviewed), url: '/review' },
-    { key: 'export', label: 'Export', value: exported ? 100 : 0, url: '/export' },
+    { key: 'extract', label: 'Extract', value: share((p) => p.quantity != null), url: 'positions' as const },
+    { key: 'match', label: 'Match', value: share((p) => p.match_kind !== 'unknown'), url: 'matched' as const },
+    { key: 'calculate', label: 'Calculate', value: share((p) => p.direct_position_cost_chf > 0), url: 'calculation' as const },
+    { key: 'review', label: 'Review', value: share((p) => !needsDecision(p)), url: 'review' as const },
+    { key: 'approve', label: 'Approve', value: share((p) => p.reviewed), url: 'review' as const },
+    { key: 'export', label: 'Export', value: exported ? 100 : 0, url: 'export' as const },
   ]
 }
 

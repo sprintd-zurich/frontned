@@ -1,14 +1,23 @@
 import { create } from 'zustand'
-import { api, type ProductivityRule } from './api'
+import { api, type DatasetImport, type ProductivityRule } from './api'
 import type { Pill } from './derive'
-import type { CatalogItem, Estimate, Meta, Parameters, PositionOverride, TenderSummary } from './types'
+import type {
+  CatalogItem,
+  Dataset,
+  Estimate,
+  Meta,
+  MaterialInflation,
+  NewQuote,
+  Parameters,
+  PositionOverride,
+  Status,
+  TenderSummary,
+} from './types'
 
 const LAST = 'equans-tender-id'
 
 interface Filters {
   system: string
-  /** HVAC trade from the category strip */
-  category: string
   pill: Pill
   search: string
   section: string
@@ -21,61 +30,67 @@ interface State extends Filters {
   estimate: Estimate | null
   tenders: TenderSummary[]
   catalog: CatalogItem[]
+  datasets: Dataset[]
   rules: Record<string, ProductivityRule>
   selected: string | null
   busy: string | null
   error: string | null
   toast: string
   ready: boolean
+  /** Calculation page: the position table or the project build-up. */
+  calcView: 'positions' | 'buildup'
   filter: (f: Partial<Filters>) => void
   clearFilters: () => void
   select: (lvId: string | null) => void
   notify: (s: string) => void
   init: () => Promise<void>
   refreshTenders: () => Promise<void>
-  open: (id: string) => Promise<void>
-  loadDemo: () => Promise<void>
-  upload: (f: File) => Promise<void>
+  open: (id: string) => Promise<string | null>
+  loadDemo: () => Promise<string | null>
+  upload: (f: File) => Promise<string | null>
   close: () => void
   removeTender: (id: string) => Promise<void>
+  archiveTender: (id: string, archived: boolean) => Promise<void>
   override: (lvId: string, body: PositionOverride, done?: string) => Promise<void>
-  addNote: (lvId: string, text: string) => Promise<void>
+  bulk: (lvIds: string[], body: { reviewed?: boolean; status?: Status }, done?: string) => Promise<void>
+  addNote: (lvId: string, text: string, author?: string) => Promise<void>
   deleteNote: (lvId: string, nid: string) => Promise<void>
   setParams: (b: Partial<Parameters>) => Promise<void>
+  setMaterialInflation: (b: MaterialInflation) => Promise<void>
   setMeta: (b: Partial<Meta>) => Promise<void>
+  refreshDatasets: () => Promise<void>
+  setDataset: (datasetId: string, version?: number) => Promise<void>
+  createDataset: (body: {
+    name: string
+    clone_of?: string
+    region?: string
+    region_label?: string
+    country?: string
+    location?: string
+    material_factor_pct?: number
+    labour_factor_pct?: number
+  }) => Promise<void>
+  importDataset: (body: DatasetImport) => Promise<boolean>
+  deleteDataset: (datasetId: string) => Promise<void>
+  addQuote: (body: NewQuote, done?: string) => Promise<void>
+  importQuoteWorkbook: (file: File, supplier: string, reference: string, quotedAt: string) => Promise<void>
+  importQuoteCsv: (file: File, supplier: string, reference: string, quotedAt: string) => Promise<void>
+  deleteQuote: (qid: string) => Promise<void>
+  promoteQuote: (qid: string, datasetId: string) => Promise<void>
   saveSnapshot: (name: string) => Promise<void>
   applySnapshot: (sid: string) => Promise<void>
   deleteSnapshot: (sid: string) => Promise<void>
-  /** any change that returns the estimate (sheets, experience, …) */
-  act: (label: string, fn: (tid: string) => Promise<Estimate>, done?: string) => Promise<boolean>
-  /** share of the window the left side of the split views takes (0.2–0.8) */
-  ratio: number
-  setRatio: (r: number) => void
 }
 
-const RATIO = 'equans-split-ratio'
-function savedRatio() {
-  try {
-    const r = Number(localStorage.getItem(RATIO))
-    return r >= 0.2 && r <= 0.8 ? r : 0.5
-  } catch {
-    return 0.5
-  }
-}
-
-const NO_FILTERS: Filters = { system: 'all', category: 'all', pill: 'all', search: '', section: 'all', hideDucts: false, only: null }
+const NO_FILTERS: Filters = { system: 'all', pill: 'all', search: '', section: 'all', hideDucts: false, only: null }
 
 function remember(id: string | null) {
   try {
     if (id) localStorage.setItem(LAST, id)
     else localStorage.removeItem(LAST)
   } catch {
-    /* private mode: the URL still carries the tender */
+    /* private mode: the URL path still carries the tender */
   }
-  const url = new URL(location.href)
-  if (id) url.searchParams.set('tender', id)
-  else url.searchParams.delete('tender')
-  history.replaceState(history.state, '', url)
 }
 
 export const useStore = create<State>((set, get) => {
@@ -106,23 +121,14 @@ export const useStore = create<State>((set, get) => {
     estimate: null,
     tenders: [],
     catalog: [],
+    datasets: [],
     rules: {},
     selected: null,
     busy: null,
     error: null,
     toast: '',
     ready: false,
-    ratio: savedRatio(),
-    setRatio: (r) => {
-      const ratio = Math.min(0.8, Math.max(0.2, r))
-      set({ ratio })
-      try {
-        localStorage.setItem(RATIO, String(ratio))
-      } catch {
-        /* the ratio then lasts for this visit */
-      }
-    },
-    act: (label, fn, done) => run(label, () => fn(tid()), done),
+    calcView: 'positions',
     filter: (f) => set(f),
     clearFilters: () => set(NO_FILTERS),
     select: (selected) => set({ selected }),
@@ -134,14 +140,8 @@ export const useStore = create<State>((set, get) => {
         .productivity()
         .then((r) => set({ rules: Object.fromEntries(r.map((x) => [x.install_code, x])) }))
         .catch(() => {})
+      get().refreshDatasets()
       await get().refreshTenders()
-      let id = new URLSearchParams(location.search).get('tender')
-      try {
-        id = id ?? localStorage.getItem(LAST)
-      } catch {
-        /* ignore */
-      }
-      if (id && get().tenders.some((t) => t.id === id)) await get().open(id)
       set({ ready: true })
     },
     refreshTenders: async () => {
@@ -152,18 +152,25 @@ export const useStore = create<State>((set, get) => {
       }
     },
     open: async (id) => {
+      if (get().estimate?.tender.id === id) return id
       set({ ...NO_FILTERS, selected: null })
-      await run('Loading estimate…', () => api.get(id))
+      return (await run('Loading estimate…', () => api.get(id))) ? id : null
     },
     loadDemo: async () => {
       set({ ...NO_FILTERS, selected: null })
-      if (await run('Reading the tender and pricing every position…', api.loadDemo, 'Tender imported and priced.'))
+      if (await run('Reading the tender and pricing every position…', api.loadDemo, 'Tender imported and priced.')) {
         get().refreshTenders()
+        return get().estimate?.tender.id ?? null
+      }
+      return null
     },
     upload: async (f) => {
       set({ ...NO_FILTERS, selected: null })
-      if (await run(`Reading ${f.name} and pricing every position…`, () => api.upload(f), 'Tender imported and priced.'))
+      if (await run(`Reading ${f.name} and pricing every position…`, () => api.upload(f), 'Tender imported and priced.')) {
         get().refreshTenders()
+        return get().estimate?.tender.id ?? null
+      }
+      return null
     },
     close: () => {
       set({ estimate: null, selected: null, ...NO_FILTERS })
@@ -179,11 +186,24 @@ export const useStore = create<State>((set, get) => {
         set({ error: (err as Error).message })
       }
     },
+    archiveTender: async (id, archived) => {
+      try {
+        await api.archive(id, archived)
+        if (archived && get().estimate?.tender.id === id) get().close()
+        await get().refreshTenders()
+        set({ toast: archived ? 'Project archived.' : 'Project restored.' })
+      } catch (err) {
+        set({ error: (err as Error).message })
+      }
+    },
     override: async (lvId, body, done) => {
       await run('Recalculating…', () => api.override(tid(), lvId, body), done)
     },
-    addNote: async (lvId, text) => {
-      await run('Saving note…', () => api.addNote(tid(), lvId, text, get().estimate?.tender.meta.estimator), 'Note saved.')
+    bulk: async (lvIds, body, done) => {
+      await run('Updating positions…', () => api.bulk(tid(), { lv_ids: lvIds, ...body }), done)
+    },
+    addNote: async (lvId, text, author) => {
+      await run('Saving note…', () => api.addNote(tid(), lvId, text, author ?? get().estimate?.tender.meta.estimator), 'Note saved.')
     },
     deleteNote: async (lvId, nid) => {
       await run('Removing note…', () => api.deleteNote(tid(), lvId, nid))
@@ -191,9 +211,85 @@ export const useStore = create<State>((set, get) => {
     setParams: async (b) => {
       await run('Recalculating…', () => api.setParameters(tid(), b), 'Parameters applied; every price is recalculated.')
     },
+    setMaterialInflation: async (b) => {
+      await run('Recalculating…', () => api.setMaterialInflation(tid(), b), 'Material inflation applied.')
+    },
     setMeta: async (b) => {
       await run('Saving…', () => api.setMeta(tid(), b), 'Project details saved.')
       get().refreshTenders()
+    },
+    refreshDatasets: async () => {
+      try {
+        set({ datasets: await api.datasets() })
+      } catch {
+        /* the price-book picker simply stays empty */
+      }
+    },
+    setDataset: async (datasetId, version) => {
+      const name = get().datasets.find((d) => d.id === datasetId)?.name ?? datasetId
+      await run('Repricing against the price book\u2026', () => api.setDataset(tid(), { id: datasetId, version }),
+        `Price book set to ${name}.`)
+    },
+    createDataset: async (body) => {
+      set({ busy: 'Creating the price book\u2026', error: null })
+      try {
+        await api.createDataset(body)
+        await get().refreshDatasets()
+        set({ toast: `Price book "${body.name}" created.` })
+      } catch (err) {
+        set({ error: (err as Error).message })
+      } finally {
+        set({ busy: null })
+      }
+    },
+    importDataset: async (body) => {
+      set({ busy: 'Validating and importing CSV files…', error: null })
+      try {
+        await api.importDataset(body)
+        await get().refreshDatasets()
+        set({ toast: `Dataset "${body.name}" imported.` })
+        return true
+      } catch (err) {
+        set({ error: (err as Error).message })
+        return false
+      } finally {
+        set({ busy: null })
+      }
+    },
+    deleteDataset: async (datasetId) => {
+      try {
+        await api.deleteDataset(datasetId)
+        await get().refreshDatasets()
+        set({ toast: 'Price book removed.' })
+      } catch (err) {
+        set({ error: (err as Error).message })
+      }
+    },
+    addQuote: async (body, done) => {
+      await run('Applying the supplier quote\u2026', () => api.addQuote(tid(), body), done ?? 'Supplier quote applied.')
+    },
+    importQuoteWorkbook: async (file, supplier, reference, quotedAt) => {
+      await run(
+        'Importing supplier prices…',
+        () => api.importQuoteWorkbook(tid(), file, supplier, reference, quotedAt),
+        'Supplier prices imported. Calculation updated.',
+      )
+    },
+    importQuoteCsv: async (file, supplier, reference, quotedAt) => {
+      await run(
+        'Importing supplier prices…',
+        () => api.importQuoteCsv(tid(), file, supplier, reference, quotedAt),
+        'Supplier prices imported. Calculation updated.',
+      )
+    },
+    deleteQuote: async (qid) => {
+      await run('Removing the quote\u2026', () => api.deleteQuote(tid(), qid), 'Quote removed.')
+    },
+    promoteQuote: async (qid, datasetId) => {
+      const name = get().datasets.find((d) => d.id === datasetId)?.name ?? datasetId
+      if (await run('Publishing to the price book\u2026', () => api.promoteQuote(tid(), qid, datasetId),
+        `Quote published to ${name}.`))
+        get().refreshDatasets()
     },
     saveSnapshot: async (name) => {
       await run('Saving scenario…', () => api.saveSnapshot(tid(), name), `Scenario "${name}" saved.`)

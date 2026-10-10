@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
-import { ChevronLeft, ChevronRight, Minus, Plus } from 'lucide-react'
+import { Minus, Plus } from 'lucide-react'
 import { api } from '../api'
 import type { Position, SourceLocation } from '../types'
 
 const cache = new Map<string, Promise<SourceLocation>>()
 
-export function useSource(tenderId: string, lvId: string | null) {
+function useSource(tenderId: string, lvId: string | null) {
   const [src, setSrc] = useState<SourceLocation | null>(null)
   useEffect(() => {
     if (!lvId) return
@@ -20,71 +20,44 @@ export function useSource(tenderId: string, lvId: string | null) {
   return src && lvId ? src : null
 }
 
-/** The rendered tender page with the position's source highlighted (block in peach, quantity line in orange). */
+/** The tender as a scrollable stack of pages. The selected position's page is scrolled into view and highlighted. */
 export function SourceView({
   tenderId,
   position,
   pages,
   compact = false,
   zoomable = false,
-  priced,
+  zoom: controlledZoom,
+  onZoomChange,
+  pricedKey,
 }: {
   tenderId: string
   position: Position
   pages: number
   compact?: boolean
   zoomable?: boolean
-  /** show the priced tender (same page numbers, price annex appended) instead of the original */
-  priced?: { key: string; pages: number }
+  zoom?: number
+  onZoomChange?: (zoom: number) => void
+  pricedKey?: string
 }) {
-  const total = priced?.pages ?? pages
   const src = useSource(tenderId, position.lv_id)
-  const [page, setPage] = useState(position.source_page)
-  const [zoom, setZoom] = useState(100)
-  const [loaded, setLoaded] = useState(false)
+  const [internalZoom, setInternalZoom] = useState(100)
+  const zoom = controlledZoom ?? internalZoom
+  const setZoom = onZoomChange ?? setInternalZoom
   const view = useRef<HTMLDivElement>(null)
-  const paper = useRef<HTMLDivElement>(null)
-  useEffect(() => setPage(position.source_page), [position.lv_id, position.source_page])
-  useEffect(() => setLoaded(false), [page])
+  const target = position.source_page
 
-  const marks = src && src.page === page ? src : null
-  // bring the highlighted block into view once the page image has its size
   useEffect(() => {
-    const v = view.current
-    const p = paper.current
-    if (!v || !p || !loaded || !marks) return
-    const box = marks.block ?? marks.lines[0]
-    if (box) v.scrollTop = Math.max(0, box.y0 * p.offsetHeight - (compact ? 40 : 90))
-  }, [loaded, marks, compact, zoom])
+    const root = view.current
+    if (!root) return
+    const slot = root.querySelector<HTMLElement>(`[data-page="${target}"]`)
+    if (slot) root.scrollTop = Math.max(0, slot.offsetTop)
+  }, [position.lv_id, target])
 
   return (
-    <div className={`source-view ${compact ? 'compact' : ''}`}>
-      <div className="document-toolbar">
-        <div className="inline">
-          <button className="icon-button" aria-label="Previous page" disabled={page <= 1} onClick={() => setPage(page - 1)}>
-            <ChevronLeft size={15} />
-          </button>
-          <span>
-            Page <b>{page}</b> / {total}
-          </span>
-          <button className="icon-button" aria-label="Next page" disabled={page >= total} onClick={() => setPage(page + 1)}>
-            <ChevronRight size={15} />
-          </button>
-          {page !== position.source_page && (
-            <button className="text-button" onClick={() => setPage(position.source_page)}>
-              Back to p. {position.source_page}
-            </button>
-          )}
-          {position.source_pages.length > 1 &&
-            position.source_pages
-              .filter((n) => n !== position.source_page)
-              .map((n) => (
-                <button key={n} className="text-button" onClick={() => setPage(n)}>
-                  p. {n}
-                </button>
-              ))}
-        </div>
-        {zoomable && (
+    <div className={`source-view scrollable ${compact ? 'compact' : ''}`}>
+      {zoomable && (
+        <div className="document-toolbar">
           <div className="inline">
             <button className="icon-button" aria-label="Zoom out" disabled={zoom <= 75} onClick={() => setZoom(zoom - 25)}>
               <Minus size={15} />
@@ -94,19 +67,90 @@ export function SourceView({
               <Plus size={15} />
             </button>
           </div>
-        )}
-      </div>
-      <div ref={view} className="document-viewport source-viewport">
-        <div ref={paper} className="source-paper" style={{ width: `${zoom}%` }}>
-          <img
-            src={priced ? api.pricedLvPageUrl(tenderId, page, priced.key) : api.pageUrl(tenderId, page)}
-            alt={`${priced ? 'Priced tender' : 'Tender'} page ${page}`} onLoad={() => setLoaded(true)} />
-          {marks?.block && <i className="hl-block" style={boxStyle(marks.block)} />}
-          {marks?.lines.map((b, i) => <i key={i} className="hl-line" style={boxStyle(b)} />)}
+        </div>
+      )}
+      <div ref={view} className="document-viewport source-viewport source-scroll">
+        <div className="source-stack" style={{ width: `${zoom}%` }}>
+          {Array.from({ length: pages }, (_, i) => i + 1).map((n) => (
+            <TenderPage
+              key={n}
+              tenderId={tenderId}
+              page={n}
+              marks={src && src.page === n ? src : null}
+              isSource={n === target}
+              pricedKey={pricedKey}
+            />
+          ))}
         </div>
       </div>
-      {src && src.lines.length === 0 && page === position.source_page && (
-        <small className="muted">The source line could not be located on the page; the extracted text is shown under Technical.</small>
+      {src && src.lines.length === 0 && (
+        <small className="muted">
+          The source line could not be located on the page; the extracted text is shown under Technical.
+        </small>
+      )}
+    </div>
+  )
+}
+
+function TenderPage({
+  tenderId,
+  page,
+  marks,
+  isSource,
+  pricedKey,
+}: {
+  tenderId: string
+  page: number
+  marks: SourceLocation | null
+  isSource: boolean
+  pricedKey?: string
+}) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [show, setShow] = useState(false)
+  const [loaded, setLoaded] = useState(false)
+
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const io = new IntersectionObserver(
+      ([e]) => {
+        if (e.isIntersecting) setShow(true)
+      },
+      { rootMargin: '800px 0px' },
+    )
+    io.observe(el)
+    return () => io.disconnect()
+  }, [])
+
+  useEffect(() => {
+    if (!loaded || !marks || !isSource) return
+    const v = ref.current?.closest('.source-viewport')
+    const paper = ref.current
+    if (!v || !paper) return
+    const box = marks.block ?? marks.lines[0]
+    if (box) {
+      const top = paper.offsetTop + box.y0 * paper.offsetHeight
+      ;(v as HTMLElement).scrollTop = Math.max(0, top - 80)
+    }
+  }, [loaded, marks, isSource])
+
+  return (
+    <div ref={ref} data-page={page} className={`source-page-slot ${isSource ? 'source' : ''}`}>
+      <span className="source-page-label">Page {page}</span>
+      {show ? (
+        <div className="source-paper">
+          <img
+            src={pricedKey ? api.pricedLvPageUrl(tenderId, page, pricedKey) : api.pageUrl(tenderId, page)}
+            alt={`${pricedKey ? 'Priced tender' : 'Tender'} page ${page}`}
+            onLoad={() => setLoaded(true)}
+          />
+          {marks?.block && <i className="hl-block" style={boxStyle(marks.block)} />}
+          {marks?.lines.map((b, i) => (
+            <i key={i} className="hl-line" style={boxStyle(b)} />
+          ))}
+        </div>
+      ) : (
+        <div className="source-page-placeholder">Page {page}</div>
       )}
     </div>
   )

@@ -1,177 +1,210 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { AlertTriangle, CheckCircle2, ChevronRight, Clock3, Download, Eye, FileSpreadsheet } from 'lucide-react'
+import { ArrowRight, Download, FileSpreadsheet, FileText, Minus, Plus, RefreshCw, Search, X } from 'lucide-react'
 import { api } from '../api'
-import { isBlocker, lastOf, metrics, needsDecision, positionLabel, workflow } from '../derive'
-import { fmtChf } from '../format'
+import { metrics } from '../derive'
+import { fmtChf, fmtNum, unit } from '../format'
+import { tenderPath } from '../routes'
 import { useEstimate, useStore } from '../store'
-import { PreviewModal, type PreviewKind } from '../components/PreviewModal'
-import { Button, Ring, StatusBadge } from '../components/ui'
-import { FaceToFace } from './FaceToFace'
+import { Button } from '../components/ui'
+import { SourceView } from '../components/SourceView'
+
+type FilterMode = 'all' | 'unpriced' | 'edited' | 'open'
 
 export function Export() {
-  const e = useEstimate()
-  const { select, filter } = useStore()
+  const estimate = useStore((state) => state.estimate)
   const navigate = useNavigate()
-  const [preview, setPreview] = useState<PreviewKind | null>(null)
-  const [showAll, setShowAll] = useState(false)
-  const m = metrics(e.positions)
-  const steps = workflow(e)
-  const blockers = e.positions.filter(isBlocker).sort((a, b) => Number(needsDecision(b)) - Number(needsDecision(a)))
-  const warnings = e.checks.filter((c) => c.level === 'warning').length
-  const rfqSent = !!lastOf(e.activity, ['export']) && e.activity.some((a) => a.kind === 'export' && (a.text.startsWith('RFQ') || a.text.startsWith('Supplier item list')))
-  const checklist: [string, boolean, string][] = [
-    ['Positions extracted from the tender', true, `${m.total} positions`],
-    ['Every position matched', steps[1].value === 100, `${steps[1].value}%`],
-    ['Open decisions resolved', m.decision === 0, m.decision ? `${m.decision} open` : 'Complete'],
-    ['Supplier quotes requested', m.quote === 0 || rfqSent, m.quote ? `${m.quote} positions` : 'Complete'],
-    ['Design checks verified', warnings === 0, warnings ? `${warnings} to verify` : 'Complete'],
-    ['All positions approved', m.open === 0, m.open ? `${m.open} open` : 'Complete'],
-    ['Submission date set', !!e.tender.meta.submission_date, e.tender.meta.submission_date || 'Open'],
-  ]
-  return (
-    <div className="export-page">
-      <section className="card export-header">
-        <div>
-          <span className="eyebrow">SUBMISSION WORKSPACE</span>
-          <h1>Export & submission</h1>
-          <p>
-            {e.tender.meta.project_name || e.tender.name} <span className="separator">|</span> {e.tender.meta.trade || 'BKP 244'}{' '}
-            <span className="separator">|</span> {fmtChf(e.project.selling_price_rounded_chf)}
-          </p>
-        </div>
-        <div className="inline">
-          <Button onClick={() => setPreview('excel')}>
-            <FileSpreadsheet size={16} /> Offer (Excel)
-          </Button>
-          <Button primary onClick={() => setPreview('pdf')}>
-            <Eye size={16} /> Preview priced tender
-          </Button>
-        </div>
-      </section>
-      <FaceToFace priced />
-      <div className="export-grid">
-        <section className="card">
-          <h2>Submission checklist</h2>
-          <div className="export-progress">
-            <Ring value={m.percent} />
-            <div>
-              <h2>
-                {m.approved} of {m.priceable} approved
-              </h2>
-              <p>{m.open} remaining submission blockers</p>
-            </div>
-          </div>
-          {checklist.map(([label, ok, note]) => (
-            <div className="checklist-item" key={label}>
-              {ok ? <CheckCircle2 className="success-text" size={21} /> : <Clock3 className="warning-text" size={21} />}
-              <span>{label}</span>
-              <small>{note}</small>
-            </div>
-          ))}
-          <div className="notice">
-            <AlertTriangle size={19} />
-            <span>
-              Exports always reflect the current estimate. Open positions are exported with their status, so the files can be
-              checked before every position is approved.
-            </span>
-          </div>
-        </section>
-        <section className="card blockers">
-          <div className="section-heading">
-            <h2>Unresolved blockers</h2>
-            <span className="count-badge">{blockers.length}</span>
-          </div>
-          {blockers.length ? (
-            <>
-              {(showAll ? blockers : blockers.slice(0, 12)).map((p) => (
-                <button
-                  key={p.lv_id}
-                  onClick={() => {
-                    select(p.lv_id)
-                    filter({ system: 'all', pill: 'all', search: '', only: null })
-                    navigate('/review')
-                  }}
-                >
-                  <span>
-                    <strong>{positionLabel(p)}</strong>
-                    <small>
-                      {p.lv_id} · {p.assumptions[0] ?? 'Approval pending'}
-                    </small>
-                  </span>
-                  <StatusBadge p={p} />
-                  <ChevronRight size={16} />
-                </button>
-              ))}
-              {blockers.length > 12 && (
-                <button className="text-button show-more" onClick={() => setShowAll(!showAll)}>
-                  {showAll ? 'Show fewer' : `Show all ${blockers.length}`}
-                </button>
-              )}
-            </>
-          ) : (
-            <div className="empty-state">
-              <CheckCircle2 size={34} />
-              <h3>Ready for submission</h3>
-              <p>Every priced position is approved.</p>
-            </div>
-          )}
-        </section>
-      </div>
-      <section className="card">
-        <h2>Documents</h2>
-        <div className="doc-grid">
-          <Doc
-            icon="PDF"
-            title="Priced tender (PDF)"
-            sub="The LV itself with unit prices, amounts, chapter totals and the cover sheet filled in"
-            onPreview={() => setPreview('pdf')}
-            href={api.pricedLvUrl(e.tender.id)}
-          />
-          <Doc
-            icon="XLS"
-            title="Offer workbook (Excel)"
-            sub="Summary, every position with its source page, open items, RFQs and parameters"
-            onPreview={() => setPreview('excel')}
-            href={api.exportUrl(e.tender.id)}
-          />
-          <Doc icon="PDF" title="Original tender" sub={`${e.tender.name} · ${e.tender.pages} pages`} href={api.tenderPdfUrl(e.tender.id)} open />
-        </div>
-      </section>
-      <section className="card export-supplier">
-        <div>
-          <h2>Supplier requests</h2>
-          <p className="muted">
-            {m.quote ? `${m.quote} positions still wait for a supplier price.` : 'No position waits for a supplier price.'} Requests, mails
-            and product sheets are prepared on the Supplier tab.
-          </p>
-        </div>
-        <Button onClick={() => navigate('/supplier')}>
-          Open Supplier <ChevronRight size={16} />
+
+  if (!estimate) {
+    return (
+      <div className="card" style={{ maxWidth: '640px', margin: '40px auto', textAlign: 'center', padding: '40px 24px' }}>
+        <FileText size={36} color="#0785ff" style={{ margin: '0 auto 12px' }} />
+        <h2>No tender loaded</h2>
+        <Button primary onClick={() => navigate('/')}>
+          Go to projects <ArrowRight size={16} />
         </Button>
-      </section>
-      {preview && <PreviewModal kind={preview} tenderId={e.tender.id} onClose={() => setPreview(null)} />}
-    </div>
-  )
+      </div>
+    )
+  }
+
+  return <ExportContent />
 }
 
-function Doc({ icon, title, sub, onPreview, href, open = false }: { icon: string; title: string; sub: string; onPreview?: () => void; href: string; open?: boolean }) {
+function ExportContent() {
+  const estimate = useEstimate()
+  const navigate = useNavigate()
+  const { selected, select, notify } = useStore()
+  const [search, setSearch] = useState('')
+  const [filterMode, setFilterMode] = useState<FilterMode>('all')
+  const [isRefreshing, setIsRefreshing] = useState(false)
+  const [pdfZoom, setPdfZoom] = useState(100)
+  const [pdfInfo, setPdfInfo] = useState<{
+    pages: number
+    filled: number
+    positions: number
+    total_chf: number
+    key: string
+  } | null>(null)
+
+  const refreshPdf = useCallback(async (showMessage = false) => {
+    setIsRefreshing(true)
+    try {
+      const info = await api.pricedLvInfo(estimate.tender.id)
+      setPdfInfo(info)
+      if (showMessage) notify('PDF updated from the latest calculation')
+    } catch (error) {
+      notify((error as Error).message || 'Could not update the PDF')
+    } finally {
+      setIsRefreshing(false)
+    }
+  }, [estimate.tender.id, notify])
+
+  useEffect(() => {
+    void refreshPdf()
+  }, [estimate.positions, estimate.project.selling_price_rounded_chf, refreshPdf])
+
+  const filteredPositions = useMemo(() => {
+    const query = search.trim().toLowerCase()
+    return estimate.positions.filter((position) => {
+      const matchesSearch = !query || `${position.ref} ${position.title} ${position.variant} ${position.system}`.toLowerCase().includes(query)
+      if (!matchesSearch) return false
+      if (filterMode === 'unpriced') return !position.net_unit_cost_chf
+      if (filterMode === 'edited') return Boolean(position.overridden?.length)
+      if (filterMode === 'open') return !position.reviewed
+      return true
+    })
+  }, [estimate.positions, filterMode, search])
+
+  const reviewPosition = (lvId: string) => {
+    select(lvId)
+    navigate(tenderPath(estimate.tender.id, 'calculation'))
+  }
+
+  const activePosition = estimate.positions.find((position) => position.lv_id === selected) ?? estimate.positions[0]
+  const summary = metrics(estimate.positions)
+
   return (
-    <div className="doc-card">
-      <span className={`file-icon ${icon === 'XLS' ? 'csv' : ''}`}>{icon}</span>
-      <div>
-        <strong>{title}</strong>
-        <small>{sub}</small>
-      </div>
-      <div className="inline">
-        {onPreview && (
-          <Button className="small" onClick={onPreview}>
-            <Eye size={14} /> Preview
+    <div className="export-studio-page clean-export-page">
+      <div className="export-studio-header clean-export-header">
+        <div>
+          <h1 className="export-studio-title">Export</h1>
+          <div className="clean-export-summary">
+            <span><b>{pdfInfo?.filled ?? summary.total}</b> items</span>
+            <span><b>{pdfInfo?.pages ?? estimate.tender.pages}</b> pages</span>
+            <span><b>{fmtChf(pdfInfo?.total_chf ?? estimate.project.selling_price_rounded_chf)}</b> total</span>
+            <span className={summary.open ? 'open' : 'ready'}>{summary.open ? `${summary.open} open` : 'Ready'}</span>
+          </div>
+        </div>
+        <div className="export-header-actions">
+          <Button onClick={() => void refreshPdf(true)} disabled={isRefreshing}>
+            <RefreshCw size={15} /> {isRefreshing ? 'Updating…' : 'Update PDF'}
           </Button>
-        )}
-        <a className="button small primary" href={href} {...(open ? { target: '_blank', rel: 'noreferrer' } : { download: true })}>
-          <Download size={14} /> {open ? 'Open' : 'Download'}
-        </a>
+          <a className="button" href={api.exportUrl(estimate.tender.id)} download>
+            <FileSpreadsheet size={15} /> Excel
+          </a>
+          <a className="button primary" href={api.pricedLvUrl(estimate.tender.id)} download>
+            <Download size={15} /> Export PDF
+          </a>
+        </div>
+      </div>
+
+      <div className="clean-export-layout">
+        <section className="structured-table-card clean-export-list">
+          <div className="structured-filter-bar">
+            <label className="search-field">
+              <Search size={15} />
+              <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search items" />
+              {search && <button className="text-button" onClick={() => setSearch('')}><X size={14} /></button>}
+            </label>
+          </div>
+
+          <div className="filter-pills clean-export-filters">
+            {([
+              ['all', `All (${estimate.positions.length})`],
+              ['unpriced', `Unpriced (${estimate.positions.filter((position) => !position.net_unit_cost_chf).length})`],
+              ['edited', `Edited (${estimate.positions.filter((position) => position.overridden?.length).length})`],
+              ['open', `Open (${estimate.positions.filter((position) => !position.reviewed).length})`],
+            ] as [FilterMode, string][]).map(([value, label]) => (
+              <button key={value} className={filterMode === value ? 'active' : ''} onClick={() => setFilterMode(value)}>
+                {label}
+              </button>
+            ))}
+          </div>
+
+          <div className="clean-export-table-scroll">
+            <table className="export-positions-table">
+              <thead>
+                <tr>
+                  <th>Ref.</th>
+                  <th>Item</th>
+                  <th className="number">Qty</th>
+                  <th className="number">Material</th>
+                  <th className="number">Labour</th>
+                  <th className="number">Total</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredPositions.map((position) => (
+                  <tr key={position.lv_id} className={selected === position.lv_id ? 'selected' : ''} onClick={() => select(position.lv_id)}>
+                    <td><span className="lv-id-badge">{position.ref}</span></td>
+                    <td>
+                      <div className="tender-item-cell">
+                        <strong>{position.title}</strong>
+                        {position.variant && <small>{position.variant}</small>}
+                      </div>
+                    </td>
+                    <td className="number">{fmtNum(position.quantity)} {unit(position.unit)}</td>
+                    <td className="number">{fmtChf(position.material_cost_chf)}</td>
+                    <td className="number">{fmtChf(position.labour_cost_chf)}</td>
+                    <td className="number"><strong>{fmtChf(position.direct_position_cost_chf)}</strong></td>
+                    <td>
+                      <button
+                        className="button small"
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          reviewPosition(position.lv_id)
+                        }}
+                      >Review</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section className="structured-doc-card clean-export-pdf">
+          <div className="doc-card-header">
+            <h2 className="doc-title">Priced Tender PDF</h2>
+            <div className="doc-card-actions">
+              <div className="inline">
+                <button className="icon-button" aria-label="Zoom out" disabled={pdfZoom <= 75} onClick={() => setPdfZoom((zoom) => Math.max(75, zoom - 25))}>
+                  <Minus size={15} />
+                </button>
+                <span>{pdfZoom}%</span>
+                <button className="icon-button" aria-label="Zoom in" disabled={pdfZoom >= 200} onClick={() => setPdfZoom((zoom) => Math.min(200, zoom + 25))}>
+                  <Plus size={15} />
+                </button>
+              </div>
+              <small>{pdfInfo?.pages ?? estimate.tender.pages} pages</small>
+            </div>
+          </div>
+          {isRefreshing && !pdfInfo ? (
+            <div className="clean-export-loading"><span className="spinner" /> Preparing PDF…</div>
+          ) : activePosition && pdfInfo ? (
+            <SourceView
+              tenderId={estimate.tender.id}
+              position={activePosition}
+              pages={pdfInfo.pages}
+              zoom={pdfZoom}
+              pricedKey={pdfInfo.key}
+            />
+          ) : null}
+          <a className="button primary clean-export-download" href={api.pricedLvUrl(estimate.tender.id)} download>
+            <Download size={15} /> Export PDF
+          </a>
+        </section>
       </div>
     </div>
   )

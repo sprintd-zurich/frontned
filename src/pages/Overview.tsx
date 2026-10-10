@@ -1,668 +1,574 @@
-import { useMemo, useRef, useState, type ReactNode } from 'react'
+import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  AlertTriangle,
   ArrowRight,
-  Building2,
-  CalendarDays,
-  Check,
-  CheckCheck,
-  ChevronLeft,
-  ChevronRight,
-  Clock3,
+  Clock,
   Database,
   FileText,
-  MapPin,
-  MessageSquare,
-  Plus,
-  Search,
-  ShieldCheck,
+  FileUp,
+  FolderOpen,
+  Play,
+  RefreshCw,
+  Sparkles,
+  Lock,
   Trash2,
   Upload,
-  UserRound,
 } from 'lucide-react'
-import { initials, isBlocker, lastOf, metrics, needsDecision, positionLabel, systemsOf, workflow } from '../derive'
-import { fmtChf, fmtDate, fmtWhen, money, parseDay } from '../format'
-import { api } from '../api'
-import { useEstimate, useStore } from '../store'
+import { fmtChf, fmtWhen } from '../format'
+import { tenderPath } from '../routes'
+import { useStore } from '../store'
 import type { Activity } from '../types'
-import { Button, Modal, Progress, Ring } from '../components/ui'
-import { MetaForm } from './MetaForm'
-import { Workflow } from '../components/Shell'
+import { Button } from '../components/ui'
+import { PriceBookBadge } from '../components/PriceBook'
 
-export function ProjectsSidebar() {
-  const { tenders, estimate, open, removeTender, busy } = useStore()
-  const [q, setQ] = useState('')
-  const [tab, setTab] = useState<'All' | 'In review' | 'New'>('All')
-  const [importing, setImporting] = useState(false)
-  const [confirm, setConfirm] = useState<string | null>(null)
+export function Overview() {
   const navigate = useNavigate()
-  const inTab = (t: (typeof tenders)[number], name: string) =>
-    name === 'All' || (name === 'In review' ? t.reviewed > 0 : t.reviewed === 0)
-  const shown = tenders.filter(
-    (t) => `${t.meta.project_name} ${t.name} ${t.meta.location}`.toLowerCase().includes(q.toLowerCase()) && inTab(t, tab),
-  )
-  return (
-    <aside className="projects-sidebar">
-      <div className="section-heading">
-        <h3>My tenders</h3>
-        <button className="button small primary" onClick={() => setImporting(true)}>
-          <Plus size={14} /> New tender
-        </button>
-      </div>
-      <label className="search-field">
-        <Search size={16} />
-        <input placeholder="Search tenders…" aria-label="Search tenders" value={q} onChange={(e) => setQ(e.target.value)} />
-      </label>
-      <div className="project-tabs">
-        {(['All', 'In review', 'New'] as const).map((t) => (
-          <button key={t} className={tab === t ? 'active' : ''} onClick={() => setTab(t)}>
-            {t} <small>{tenders.filter((x) => inTab(x, t)).length}</small>
-          </button>
-        ))}
-      </div>
-      <div className="project-list">
-        {shown.map((t, i) => (
-          <div className={`project-item ${estimate?.tender.id === t.id ? 'active' : ''}`} key={t.id}>
-            <button
-              className="project-open"
-              disabled={!!busy}
-              onClick={async () => {
-                if (estimate?.tender.id !== t.id) await open(t.id)
-                navigate('/')
-              }}
-            >
-              <img src={`/project-${(i % 9) + 1}.jpg`} alt="" />
-              <span>
-                <strong>{t.meta.project_name || t.name}</strong>
-                <small>{t.meta.location || t.name}</small>
-                <small>
-                  {fmtDate(t.created_at)} · {t.positions} positions · {t.reviewed} approved
-                </small>
-              </span>
-              <i style={{ background: estimate?.tender.id === t.id ? '#1389ff' : t.reviewed ? '#00987a' : '#ff8b38' }} />
-            </button>
-            <button className="project-remove" aria-label={`Remove ${t.name}`} title="Remove tender" onClick={() => setConfirm(t.id)}>
-              <Trash2 size={14} />
-            </button>
-          </div>
-        ))}
-        {!shown.length && <p className="muted portfolio-empty">{tenders.length ? 'No tender matches.' : 'No tender imported yet.'}</p>}
-      </div>
-      <span className="portfolio-note">Stored on the pricing server · {tenders.length} tenders</span>
-      {importing && (
-        <Modal title="Import a tender" close={() => setImporting(false)}>
-          <ImportPanel onDone={() => setImporting(false)} />
-        </Modal>
-      )}
-      {confirm && (
-        <Modal title="Remove this tender?" close={() => setConfirm(null)}>
-          <p>The tender, its estimate, notes and scenarios are deleted from the pricing server. This cannot be undone.</p>
-          <div className="modal-actions">
-            <Button onClick={() => setConfirm(null)}>Cancel</Button>
-            <Button
-              primary
-              onClick={async () => {
-                const id = confirm
-                setConfirm(null)
-                await removeTender(id)
-              }}
-            >
-              <Trash2 size={15} /> Remove
-            </Button>
-          </div>
-        </Modal>
-      )}
-    </aside>
-  )
-}
+  const { estimate } = useStore()
 
-export function ImportPanel({ onDone }: { onDone?: () => void }) {
-  const { loadDemo, upload, busy } = useStore()
-  const input = useRef<HTMLInputElement>(null)
-  const [drag, setDrag] = useState(false)
-  const navigate = useNavigate()
-  const go = async (fn: () => Promise<void>) => {
-    await fn()
-    if (useStore.getState().estimate) {
-      onDone?.()
-      navigate('/')
-    }
-  }
   return (
-    <div className="import-panel">
-      <div
-        className={`dropzone ${drag ? 'drag' : ''}`}
-        role="button"
-        tabIndex={0}
-        onKeyDown={(e) => e.key === 'Enter' && input.current?.click()}
-        onDragOver={(e) => {
-          e.preventDefault()
-          setDrag(true)
-        }}
-        onDragLeave={() => setDrag(false)}
-        onDrop={(e) => {
-          e.preventDefault()
-          setDrag(false)
-          const f = e.dataTransfer.files[0]
-          if (f) go(() => upload(f))
-        }}
-        onClick={() => !busy && input.current?.click()}
-      >
-        <input ref={input} type="file" accept="application/pdf" hidden onChange={(e) => e.target.files?.[0] && go(() => upload(e.target.files![0]))} />
-        {busy ? (
-          <>
-            <span className="spinner large" />
-            <strong>{busy}</strong>
-            <small>Extraction and pricing take a few seconds for a 200-page LV.</small>
-          </>
-        ) : (
-          <>
-            <Upload size={30} />
-            <strong>Drop the tender PDF here</strong>
-            <small>or click to choose the Leistungsverzeichnis (BKP 244)</small>
-          </>
+    <div className="overview-container">
+      {/* Hero Welcome Banner */}
+      <div className="overview-hero">
+        <div className="hero-content">
+          <span className="hero-tag">EQUANS TENDER PLATFORM</span>
+          <h1 className="hero-title">Tender Ingestion & Resource Intelligence</h1>
+          <p className="hero-desc">
+            Upload new tender PDF documents, resume your saved tender sessions, and manage reference pricing catalogues.
+          </p>
+        </div>
+
+        {estimate && (
+          <div className="hero-active-card">
+            <div className="hero-active-header">
+              <span className="live-dot" />
+              <span>ACTIVE SESSION LOADED</span>
+            </div>
+            <div className="hero-active-body">
+              <h3 title={estimate.tender.name}>{estimate.tender.name}</h3>
+              <div className="hero-active-metrics">
+                <div>
+                  <strong>{estimate.positions.length}</strong>
+                  <small>Positions</small>
+                </div>
+                <div>
+                  <strong>{estimate.tender.pages}</strong>
+                  <small>Pages</small>
+                </div>
+                <div>
+                  <strong>{fmtChf(estimate.project.cost_baseline_chf)}</strong>
+                  <small>Direct Cost</small>
+                </div>
+              </div>
+              <PriceBookBadge />
+              <Button primary onClick={() => navigate(tenderPath(estimate.tender.id, 'positions'))}>
+                Open this project <ArrowRight size={15} />
+              </Button>
+            </div>
+          </div>
         )}
       </div>
-      <div className="demo-tender">
-        <span className="eyebrow">HACKATHON TENDER</span>
-        <h3>Schulhaus Oberglatt</h3>
-        <p className="muted">BKP 244 Lüftungsanlagen · 202 pages · 6 systems</p>
-        <Button primary disabled={!!busy} onClick={() => go(loadDemo)}>
-          Import the Oberglatt tender <ArrowRight size={16} />
+
+      {/* Main 2-Column Section: Tender Management & Resume */}
+      <div className="overview-grid">
+        {/* Left Card: 1. Create Tender by Uploading PDF */}
+        <section className="card upload-tender-card">
+          <div className="section-heading">
+            <div className="heading-with-icon">
+              <div className="icon-badge blue">
+                <FileUp size={18} />
+              </div>
+              <div>
+                <h2>1. Create New Tender</h2>
+                <small className="muted">Upload tender specification PDF (e.g. BKP 244 Lüftung)</small>
+              </div>
+            </div>
+          </div>
+
+          <PdfUploadDropzone />
+        </section>
+
+        {/* Right Card: 2. Resume Previous Tender */}
+        <section className="card resume-tender-card">
+          <div className="section-heading">
+            <div className="heading-with-icon">
+              <div className="icon-badge emerald">
+                <FolderOpen size={18} />
+              </div>
+              <div>
+                <h2>2. Resume Previous Tender</h2>
+                <small className="muted">Continue working on saved and extracted tender sessions</small>
+              </div>
+            </div>
+            <RefreshTendersButton />
+          </div>
+
+          <PreviousTendersList />
+        </section>
+      </div>
+
+      {/* Section 2: Company Resources */}
+      <section className="card company-resources-section">
+        <div className="section-heading">
+          <div className="heading-with-icon">
+            <div className="icon-badge purple">
+              <Database size={18} />
+            </div>
+            <div>
+              <h2>3. Reference price books</h2>
+              <small className="muted">
+                Catalogue, installation rules with labour rates and project parameters — one versioned book per region
+              </small>
+            </div>
+          </div>
+        </div>
+
+        <CompanyResourcesManager />
+      </section>
+    </div>
+  )
+}
+function PdfUploadDropzone() {
+  const { upload, loadDemo, busy } = useStore()
+  const navigate = useNavigate()
+  const pdfInput = useRef<HTMLInputElement>(null)
+  const [dragActive, setDragActive] = useState(false)
+
+  const enter = (id: string | null) => {
+    if (id) navigate(tenderPath(id, 'positions'))
+  }
+
+  const handleFile = async (file: File) => {
+    if (!file.name.toLowerCase().endsWith('.pdf')) {
+      alert('Please upload a PDF document.')
+      return
+    }
+    enter(await upload(file))
+  }
+
+  return (
+    <div className="pdf-upload-box">
+      <div
+        className={`upload-dropzone-large ${dragActive ? 'drag' : ''}`}
+        onDragOver={(e) => {
+          e.preventDefault()
+          setDragActive(true)
+        }}
+        onDragLeave={() => setDragActive(false)}
+        onDrop={(e) => {
+          e.preventDefault()
+          setDragActive(false)
+          if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0])
+        }}
+        onClick={() => !busy && pdfInput.current?.click()}
+      >
+        <input
+          ref={pdfInput}
+          type="file"
+          accept="application/pdf"
+          hidden
+          onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
+        />
+        {busy ? (
+          <div className="dropzone-busy">
+            <span className="spinner" />
+            <h3>Processing Tender Document…</h3>
+            <p className="muted">{busy}</p>
+            <small>Extracting positions, identifying components, matching catalog rules</small>
+          </div>
+        ) : (
+          <div className="dropzone-idle">
+            <div className="dropzone-icon">
+              <FileUp size={32} />
+            </div>
+            <h3>Drop tender PDF here or browse</h3>
+            <p className="muted">Supports official BKP specification documents with full text and duct lists</p>
+            <span className="browse-badge">Select PDF File</span>
+          </div>
+        )}
+      </div>
+
+      <div className="quick-demo-action">
+        <div>
+          <strong>Quick Demo:</strong>
+          <span className="muted"> Test with pre-configured Schulhaus Oberglatt BKP 244</span>
+        </div>
+        <Button primary disabled={!!busy} onClick={async () => enter(await loadDemo())}>
+          <Sparkles size={14} /> Load Demo Tender
         </Button>
       </div>
     </div>
   )
 }
 
-export function Overview() {
-  const estimate = useStore((s) => s.estimate)
-  if (!estimate) {
+function PreviousTendersList() {
+  const { tenders, estimate, open, removeTender, busy, notify } = useStore()
+  const navigate = useNavigate()
+  const [openingId, setOpeningId] = useState<string | null>(null)
+
+  const handleResume = async (tid: string) => {
+    setOpeningId(tid)
+    try {
+      const id = await open(tid)
+      notify('Tender resumed successfully.')
+      if (id) navigate(tenderPath(id, 'positions'))
+    } finally {
+      setOpeningId(null)
+    }
+  }
+
+  const handleDelete = async (e: React.MouseEvent, tid: string, name: string) => {
+    e.stopPropagation()
+    if (confirm(`Are you sure you want to delete "${name}"?`)) {
+      await removeTender(tid)
+      notify('Tender deleted.')
+    }
+  }
+
+  if (tenders.length === 0) {
     return (
-      <section className="card welcome">
-        <span className="eyebrow">EQUANS TENDER INTELLIGENCE</span>
-        <h1>From tender to first price</h1>
-        <p className="muted">
-          Import a tender package. Every LV position is extracted, matched to the reference data and priced, with the
-          source page and every assumption one click away.
-        </p>
-        <ImportPanel />
-        <ol className="welcome-steps">
-          {[
-            ['Extract', 'Systems, positions, quantities and units from the PDF'],
-            ['Match', 'Catalogue items, supplier packages and installation rules'],
-            ['Calculate', 'Material, installation hours, labour and project costs'],
-            ['Review', 'Source page, assumptions and alternatives per position'],
-            ['Decide', 'Margin, win probability and scenarios'],
-            ['Export', 'Priced tender PDF and offer workbook'],
-          ].map(([t, d], i) => (
-            <li key={t}>
-              <b>{String(i + 1).padStart(2, '0')}</b>
-              <strong>{t}</strong>
-              <small>{d}</small>
-            </li>
-          ))}
-        </ol>
-      </section>
+      <div className="empty-tenders-state">
+        <FolderOpen size={30} color="#94a3b8" />
+        <p>No previous tenders saved yet.</p>
+        <small className="muted">Upload a PDF or load the demo tender to get started.</small>
+      </div>
     )
   }
-  return <Dashboard />
-}
 
-function Dashboard() {
-  const e = useEstimate()
-  const { filter, select } = useStore()
-  const navigate = useNavigate()
-  const [editing, setEditing] = useState(false)
-  const m = metrics(e.positions)
-  const meta = e.tender.meta
-  const systems = systemsOf(e.positions)
-  const tabs = ['Dashboard', 'Positions', 'Review', 'Supplier', 'Experience', 'Bid', 'Export', 'Details']
-  const ready = m.open === 0
   return (
-    <>
-      <section className="project-hero card">
-        <div className="hero-main">
-          <img src="/project-building.jpg" alt="" />
-          <div className="hero-title">
-            <span className="eyebrow">EQUANS TENDER INTELLIGENCE</span>
-            <h1>{meta.project_name || e.tender.name}</h1>
-            <p>
-              {meta.trade || 'Tender'} <span className="separator">|</span>{' '}
-              {meta.tender_no ? `Ausschreibung Nr. ${meta.tender_no}` : e.tender.name}
-            </p>
-            <div className="project-meta">
-              <span>
-                <Building2 />
-                {meta.client || '—'}
-              </span>
-              <span>
-                <MapPin />
-                {meta.location || '—'}
-              </span>
-              <button onClick={() => setEditing(true)}>
-                <CalendarDays />
-                {meta.submission_date ? `Submission: ${fmtDate(meta.submission_date)}` : 'Set submission date'}
-              </button>
-              <button onClick={() => setEditing(true)}>
-                <UserRound />
-                {meta.estimator || 'Set estimator'}
-              </button>
-            </div>
-          </div>
-          <div className="hero-progress">
-            <span className={`badge ${ready ? 'success' : 'info'}`}>{ready ? 'Ready to submit' : 'In progress'}</span>
-            <div className="section-heading">
-              <span>Tender completion</span>
-              <b>{m.percent}%</b>
-            </div>
-            <Progress value={m.percent} />
-            <small>
-              {m.approved} of {m.priceable} priced positions approved
-            </small>
-          </div>
-        </div>
-        <div className="project-subnav">
-          {tabs.map((t) => (
-            <button
-              key={t}
-              onClick={() => (t === 'Details' ? setEditing(true) : t !== 'Dashboard' && navigate('/' + t.toLowerCase()))}
-              className={t === 'Dashboard' ? 'active' : ''}
-            >
-              {t}
-            </button>
-          ))}
-        </div>
-        <Workflow stepsOnly />
-      </section>
-      <div className="metrics">
-        {(
-          [
-            [FileText, 'Total positions', String(m.total), `${m.priceable} priced · ${m.total - m.priceable} summary lines`, 'info', 'all'],
-            [CheckCheck, 'Approved', String(m.approved), `${m.percent}% of priced positions`, 'success', 'approved'],
-            [Clock3, 'Needs review', String(m.decision), 'Decision or missing information', 'warning', 'decision'],
-            [MessageSquare, 'Open', String(m.open), `${m.quote} quote · ${m.assumption} assumption`, 'neutral', 'all'],
-            [Database, 'Indicative price', fmtChf(e.project.selling_price_rounded_chf), `Direct cost ${fmtChf(e.project.direct_cost_chf)}`, 'info', 'value'],
-          ] as const
-        ).map(([I, label, value, sub, color, pill]) => (
-          <button
-            className="metric card"
-            key={label}
-            onClick={() => {
-              if (pill === 'value') return navigate('/review')
-              filter({ pill, system: 'all', search: '', only: null })
-              navigate(pill === 'decision' ? '/review' : '/positions')
-            }}
+    <div className="previous-tenders-list">
+      {tenders.map((t) => {
+        const isActive = estimate?.tender.id === t.id
+        const isCurrentOpening = openingId === t.id
+
+        return (
+          <div
+            key={t.id}
+            className={`tender-session-item ${isActive ? 'active' : ''}`}
+            onClick={() => !isActive && !isCurrentOpening && handleResume(t.id)}
           >
-            <span className={`metric-icon ${color}`}>
-              <I />
-            </span>
-            <span>
-              <small>{label}</small>
-              <strong>{value}</strong>
-              <small className={color}>{sub}</small>
-            </span>
-          </button>
-        ))}
-      </div>
-      <div className="dashboard-grid">
-        <Milestones onEdit={() => setEditing(true)} />
-        <Calendar />
-        <div className="dashboard-right">
-          <section className="card status-card">
-            <h3>Project status</h3>
-            <div className="status-content">
-              <Ring value={m.percent} size={114} />
-              <div>
-                {(
-                  [
-                    ['Approved', m.approved, '#009b7d'],
-                    ['Needs review', m.decision, '#ff7929'],
-                    ['Open', m.open - m.decision, '#a7afbd'],
-                  ] as const
-                ).map(([s, n, c]) => (
-                  <div className="legend-line" key={s}>
-                    <i style={{ background: c }} />
-                    <span>{s}</span>
-                    <b>{n}</b>
-                  </div>
-                ))}
-                <button className="link-button" onClick={() => navigate('/positions')}>
-                  View positions <ArrowRight size={15} />
-                </button>
+            <div className="tender-item-left">
+              <div className={`tender-icon-box ${isActive ? 'active' : ''}`}>
+                <FileText size={18} />
+              </div>
+              <div className="tender-item-info">
+                <div className="tender-name-row">
+                  <h4 title={t.name}>{t.name}</h4>
+                  {isActive && <span className="active-tag">Active</span>}
+                </div>
+                <div className="tender-meta-row">
+                  <span>
+                    <Clock size={11} /> {fmtWhen(t.created_at)}
+                  </span>
+                  <span>· {t.pages} pages</span>
+                  <span>· <b>{t.positions}</b> positions</span>
+                  {t.reviewed > 0 && <span className="reviewed-count">· {t.reviewed} approved</span>}
+                </div>
               </div>
             </div>
-          </section>
-          <section className="card system-completion">
-            <div className="section-heading">
-              <h3>System completion</h3>
-              <small>{systems.length} systems</small>
-            </div>
-            {systems.map((s) => {
-              const mm = metrics(e.positions.filter((p) => p.system === s.id))
-              return (
+
+            <div className="tender-item-actions">
+              {isActive ? (
+                <Button primary className="small" onClick={() => navigate(tenderPath(t.id, 'positions'))}>
+                  Open <ArrowRight size={13} />
+                </Button>
+              ) : (
                 <button
-                  key={s.id}
-                  title={s.id}
-                  onClick={() => {
-                    filter({ system: s.id, pill: 'all', only: null })
-                    navigate('/positions')
+                  className="button small"
+                  disabled={!!busy || isCurrentOpening}
+                  onClick={(ev) => {
+                    ev.stopPropagation()
+                    handleResume(t.id)
                   }}
                 >
-                  <span className="mini-quarter" style={{ background: s.color }} />
-                  <span>{s.name}</span>
-                  <Progress value={mm.percent} color={s.color} />
-                  <small>{mm.percent}%</small>
+                  {isCurrentOpening ? <span className="spinner" /> : <Play size={12} />} Resume
                 </button>
-              )
-            })}
-          </section>
-        </div>
-        <Tasks
-          onOpen={(lvId) => {
-            select(lvId)
-            filter({ system: 'all', search: '', pill: 'all', only: null })
-            navigate('/review')
-          }}
-        />
-        <section className="card activity">
-          <div className="section-heading">
-            <h3>Recent activity</h3>
-            <span className="live-label">Saved</span>
+              )}
+              <button
+                className="icon-button danger"
+                title="Delete saved tender"
+                onClick={(ev) => handleDelete(ev, t.id, t.name)}
+              >
+                <Trash2 size={14} />
+              </button>
+            </div>
           </div>
-          {[...e.activity]
-            .reverse()
-            .slice(0, 5)
-            .map((a, i) => (
-              <ActivityItem key={i} a={a} />
-            ))}
-          <div className="activity-tip">
-            <ShieldCheck size={20} />
-            <span>
-              Every decision stays connected.<small>Edits, approvals and notes are journaled on the server.</small>
-            </span>
-          </div>
-        </section>
-        <Documents />
-      </div>
-      {editing && (
-        <Modal title="Project details" close={() => setEditing(false)}>
-          <MetaForm onDone={() => setEditing(false)} />
-        </Modal>
-      )}
-    </>
-  )
-}
-
-export function ActivityItem({ a }: { a: Activity }) {
-  const estimator = useStore((s) => s.estimate?.tender.meta.estimator)
-  const who = a.kind === 'import' ? 'LV' : a.kind === 'export' ? 'EX' : initials(estimator)
-  return (
-    <div className="activity-item">
-      <span className={`avatar tiny ${a.kind}`}>{who}</span>
-      <div>
-        {a.text}
-        <small>{fmtWhen(a.at)}</small>
-      </div>
+        )
+      })}
     </div>
   )
 }
 
-function Milestones({ onEdit }: { onEdit: () => void }) {
-  const e = useEstimate()
-  const m = metrics(e.positions)
-  const meta = e.tender.meta
-  const lastReview = lastOf(e.activity, ['review'])
-  const lastExport = lastOf(e.activity, ['export'])
-  const exported = workflow(e).find((s) => s.key === 'export')!.value === 100
-  const items: [string, boolean, ReactNode][] = [
-    ['Tender document issued', !!meta.document_date, meta.document_date || '—'],
-    ['Tender imported', true, fmtDate(e.tender.created_at)],
-    [`${m.total} positions extracted and priced`, true, fmtDate(e.tender.created_at)],
-    ['Open decisions resolved', m.decision === 0, m.decision === 0 ? (lastReview ? fmtDate(lastReview.at) : 'Done') : `${m.decision} open`],
-    ['All positions approved', m.open === 0, m.open === 0 ? (lastReview ? fmtDate(lastReview.at) : 'Done') : `${m.open} open`],
-    ['Offer exported', exported, exported && lastExport ? fmtDate(lastExport.at) : 'Open'],
-    [
-      'Submission',
-      false,
-      meta.submission_date ? (
-        fmtDate(meta.submission_date)
-      ) : (
-        <button className="text-button" onClick={onEdit}>
-          Set date
-        </button>
-      ),
-    ],
-  ]
-  const current = items.findIndex(([, done]) => !done)
+function RefreshTendersButton() {
+  const { refreshTenders } = useStore()
+  const [spinning, setSpinning] = useState(false)
+
+  const handleRefresh = async () => {
+    setSpinning(true)
+    await refreshTenders()
+    setTimeout(() => setSpinning(false), 500)
+  }
+
   return (
-    <section className="card milestones">
-      <h3>Timeline & key milestones</h3>
-      {items.map(([title, done, date], i) => (
-        <div className={`milestone ${done ? 'done' : i === current ? 'current' : ''}`} key={title}>
-          <span>{done ? <Check size={14} /> : null}</span>
-          <b>{title}</b>
-          <small>{date}</small>
-        </div>
-      ))}
-    </section>
+    <button className="icon-button" title="Refresh tenders" onClick={handleRefresh}>
+      <RefreshCw size={14} className={spinning ? 'spin' : ''} />
+    </button>
   )
 }
 
-const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+export function CompanyResourcesManager() {
+  const { datasets, createDataset, importDataset, deleteDataset, estimate, setDataset, busy } = useStore()
+  const [creating, setCreating] = useState<'' | 'import' | 'derive'>('')
 
-function Calendar() {
-  const e = useEstimate()
-  const notify = useStore((s) => s.notify)
-  const today = new Date()
-  const submission = parseDay(e.tender.meta.submission_date)
-  const [month, setMonth] = useState(today.getMonth())
-  const [year, setYear] = useState(today.getFullYear())
-  const key = (d: Date) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`
-  const events = useMemo(() => {
-    const out = new Map<string, string[]>()
-    const add = (d: Date | null, s: string) => d && out.set(key(d), [...(out.get(key(d)) ?? []), s])
-    add(parseDay(e.tender.meta.document_date), 'Tender document issued')
-    add(new Date(e.tender.created_at), 'Tender imported')
-    e.activity.forEach((a) => a.kind !== 'import' && add(new Date(a.at), a.text))
-    add(submission, 'Submission')
-    return out
-  }, [e, submission])
-  const shift = (n: number) => {
-    const d = new Date(year, month + n, 1)
-    setMonth(d.getMonth())
-    setYear(d.getFullYear())
-  }
-  const days = new Date(year, month + 1, 0).getDate()
-  const offset = (new Date(year, month, 1).getDay() + 6) % 7
   return (
-    <section className="card calendar">
-      <div className="section-heading">
-        <h3>
-          {MONTHS[month]} {year}
-        </h3>
-        <div className="inline">
-          <button className="icon-button" aria-label="Previous month" onClick={() => shift(-1)}>
-            <ChevronLeft size={17} />
-          </button>
-          <button className="icon-button" aria-label="Next month" onClick={() => shift(1)}>
-            <ChevronRight size={17} />
-          </button>
-        </div>
-      </div>
-      <div className="calendar-grid">
-        {['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'].map((d) => (
-          <small key={d}>{d}</small>
-        ))}
-        {Array.from({ length: offset }, (_, i) => (
-          <span key={'empty' + i} />
-        ))}
-        {Array.from({ length: days }, (_, i) => i + 1).map((d) => {
-          const day = new Date(year, month, d)
-          const ev = events.get(key(day)) ?? []
-          // the days left between today and the submission deadline are tinted light red
-          const left = !!submission && day > today && day < submission && key(day) !== key(submission)
-          const cls = [
-            key(day) === key(today) ? 'today' : submission && key(day) === key(submission) ? 'deadline' : ev.length ? 'busy-day' : '',
-            left ? 'countdown' : '',
-          ].join(' ')
+    <div className="pricebook-library">
+      <div className="pricebook-library-grid">
+        {datasets.map((d) => {
+          const inUse = estimate?.dataset.id === d.id
           return (
-            <button
-              key={d}
-              className={cls}
-              title={ev.slice(0, 3).join('\n')}
-              onClick={() => notify(`${d}. ${MONTHS[month]} ${year} · ${ev.length ? `${ev.length} event${ev.length > 1 ? 's' : ''}: ${ev[ev.length - 1]}` : 'Nothing recorded'}`)}
-            >
-              {d}
-            </button>
+            <div key={d.id} className={`pricebook-tile ${inUse ? 'active' : ''}`}>
+              <div className="pricebook-tile-head">
+                <div className="resource-title-group">
+                  {d.immutable ? <Lock size={15} color="#64748b" /> : <Database size={15} color="#7c3aed" />}
+                  <div>
+                    <strong>{d.name}</strong>
+                    <small className="muted">
+                      {[d.country, d.location || d.region_label].filter(Boolean).join(' · ') || 'No location set'}
+                    </small>
+                  </div>
+                </div>
+                {inUse ? (
+                  <span className="status-pill active">In Use · v{estimate?.dataset.version}</span>
+                ) : (
+                  <span className="status-pill">v{d.latest_version}</span>
+                )}
+              </div>
+
+              <div className="pricebook-tile-actions">
+                {estimate && !inUse && (
+                  <button className="text-button" disabled={!!busy} onClick={() => setDataset(d.id)}>
+                    Use for this tender
+                  </button>
+                )}
+                {!d.immutable && (
+                  <button className="text-button danger" onClick={() => deleteDataset(d.id)}>
+                    Remove
+                  </button>
+                )}
+              </div>
+            </div>
           )
         })}
       </div>
-      <div className="calendar-legend">
-        <span>
-          <i className="blue" />
-          Today
-        </span>
-        <span>
-          <i className="red" />
-          Submission
-        </span>
-        {submission && (
-          <span>
-            <i className="light-red" />
-            Days left
-          </span>
-        )}
-        <span>
-          <i className="peach" />
-          Tender activity
-        </span>
-      </div>
-    </section>
-  )
-}
 
-function Tasks({ onOpen }: { onOpen: (lvId: string) => void }) {
-  const e = useEstimate()
-  const navigate = useNavigate()
-  const filter = useStore((s) => s.filter)
-  const due = e.tender.meta.submission_date ? fmtDate(e.tender.meta.submission_date) : '—'
-  const quotes = e.positions.filter((p) => !p.reviewed && p.status === 'supplier_quote_required')
-  const calculated = e.positions.filter((p) => !p.reviewed && p.status === 'calculated')
-  const tasks: { name: string; sub: string; prio: 'High' | 'Medium' | 'Low'; go: () => void }[] = [
-    ...e.positions.filter(needsDecision).map((p) => ({
-      name: positionLabel(p),
-      sub: `${p.lv_id} · ${p.assumptions[0] ?? 'Decide how to price this position'}`,
-      prio: 'High' as const,
-      go: () => onOpen(p.lv_id),
-    })),
-    ...e.checks
-      .filter((c) => c.level === 'warning')
-      .map((c) => ({
-        name: c.title,
-        sub: `Design check · PDF page ${c.pages.join(', ')}`,
-        prio: 'High' as const,
-        go: () => {
-          filter({ only: { label: c.title, ids: c.positions }, pill: 'all', system: 'all' })
-          navigate('/review')
-        },
-      })),
-    ...(quotes.length
-      ? [{ name: 'Request supplier quotes', sub: `${quotes.length} positions priced from package benchmarks`, prio: 'Medium' as const, go: () => navigate('/supplier') }]
-      : []),
-    ...(calculated.length
-      ? [
-          {
-            name: `Approve ${calculated.length} catalogue-priced positions`,
-            sub: 'Exact catalogue match, check and approve',
-            prio: 'Low' as const,
-            go: () => {
-              filter({ pill: 'calculated', system: 'all', only: null })
-              navigate('/review')
-            },
-          },
-        ]
-      : []),
-  ]
-  return (
-    <section className="card tasks">
-      <div className="section-heading">
-        <h3>Open tasks</h3>
-        <button className="text-button" onClick={() => navigate('/review')}>
-          View all <ArrowRight size={14} />
-        </button>
-      </div>
-      <table>
-        <thead>
-          <tr>
-            <th>Task</th>
-            <th>Due date</th>
-            <th>Priority</th>
-          </tr>
-        </thead>
-        <tbody>
-          {tasks.slice(0, 5).map((t, i) => (
-            <tr key={i} onClick={t.go}>
-              <td>
-                {t.name}
-                <small>{t.sub}</small>
-              </td>
-              <td className="due">{due}</td>
-              <td>
-                <span className={`priority ${t.prio === 'High' ? 'high' : t.prio === 'Low' ? 'low' : ''}`}>{t.prio}</span>
-              </td>
-            </tr>
-          ))}
-          {!tasks.length && (
-            <tr>
-              <td colSpan={3}>
-                <Check size={14} /> Nothing open. Export the offer.
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
-      {tasks.length > 5 && <small className="muted">+ {tasks.length - 5} more tasks</small>}
-    </section>
-  )
-}
-
-function Documents() {
-  const e = useEstimate()
-  const navigate = useNavigate()
-  const m = metrics(e.positions)
-  const blockers = e.positions.filter(isBlocker).length
-  const docs: [string, string, string, () => void][] = [
-    [e.tender.name, `Original tender · ${e.tender.pages} pages`, 'PDF', () => window.open(api.tenderPdfUrl(e.tender.id), '_blank')],
-    ['Priced tender (PDF)', `Prices written into the LV · ${fmtChf(e.project.selling_price_rounded_chf)}`, 'PDF', () => navigate('/export')],
-    ['Offer workbook (Excel)', `${m.total} positions with sources · ${blockers} open`, 'XLS', () => navigate('/export')],
-    ['Supplier requests', `${e.positions.filter((p) => p.status === 'supplier_quote_required').length} positions wait for a price`, 'RFQ', () => navigate('/supplier')],
-  ]
-  return (
-    <section className="card documents">
-      <div className="section-heading">
-        <h3>Key documents</h3>
-        <button className="text-button" onClick={() => navigate('/export')}>
-          View all <ArrowRight size={14} />
-        </button>
-      </div>
-      {docs.map(([name, sub, type, go]) => (
-        <button key={name} onClick={go}>
-          <span className={`file-icon ${type === 'XLS' ? 'csv' : ''}`}>{type}</span>
-          <span>
-            {name}
-            <small>{sub}</small>
-          </span>
-          <ChevronRight size={15} />
-        </button>
-      ))}
-      {e.checks.some((c) => c.level === 'warning') && (
-        <div className="notice subtle">
-          <AlertTriangle size={16} /> {e.checks.filter((c) => c.level === 'warning').length} design checks to verify before submitting
+      {creating === 'import' ? (
+        <ImportPriceBookForm
+          datasets={datasets}
+          busy={!!busy}
+          onCancel={() => setCreating('')}
+          onImport={async (body) => {
+            if (await importDataset(body)) setCreating('')
+          }}
+        />
+      ) : creating === 'derive' ? (
+        <NewPriceBookForm
+          datasets={datasets}
+          onCancel={() => setCreating('')}
+          onCreate={async (body) => {
+            await createDataset(body)
+            setCreating('')
+          }}
+        />
+      ) : (
+        <div className="pricebook-create-actions">
+          <Button primary onClick={() => setCreating('import')}><FileUp size={15} /> Import CSV dataset</Button>
+          <Button onClick={() => setCreating('derive')}><Upload size={15} /> Derive from existing</Button>
         </div>
       )}
-      <small className="muted">Total CHF {money(e.project.selling_price_rounded_chf)} incl. overhead and margin</small>
-    </section>
+    </div>
+  )
+}
+
+/** Create a regional book by copying an existing one and shifting material costs and labour rates. */
+function NewPriceBookForm({
+  datasets,
+  onCreate,
+  onCancel,
+}: {
+  datasets: { id: string; name: string; latest_version: number }[]
+  onCreate: (b: {
+    name: string
+    clone_of: string
+    region: string
+    region_label: string
+    country: string
+    location: string
+    material_factor_pct: number
+    labour_factor_pct: number
+  }) => void
+  onCancel: () => void
+}) {
+  const [form, setForm] = useState({
+    name: '',
+    clone_of: datasets[0]?.id ?? '',
+    region: '',
+    region_label: '',
+    country: 'Switzerland',
+    location: '',
+    material: '0',
+    labour: '0',
+  })
+  const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }))
+
+  return (
+    <form
+      className="pricebook-form"
+      onSubmit={(ev) => {
+        ev.preventDefault()
+        if (!form.name.trim()) return
+        onCreate({
+          name: form.name.trim(),
+          clone_of: form.clone_of,
+          region: form.region.trim(),
+          region_label: form.region_label.trim(),
+          country: form.country.trim(),
+          location: form.location.trim(),
+          material_factor_pct: Number(form.material) || 0,
+          labour_factor_pct: Number(form.labour) || 0,
+        })
+      }}
+    >
+      <h4>
+        <Upload size={15} /> Derive a new price book
+      </h4>
+      <p className="muted">
+        Every net cost and hourly rate is copied and shifted by the percentages below. The derivation is recorded on the
+        book so the figures never look independently sourced.
+      </p>
+      <div className="pricebook-form-grid">
+        <label>
+          Name
+          <input value={form.name} onChange={(ev) => set('name', ev.target.value)} placeholder="Equans Romandie 2026" required />
+        </label>
+        <label>
+          Copy from
+          <select value={form.clone_of} onChange={(ev) => set('clone_of', ev.target.value)}>
+            {datasets.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.name} (v{d.latest_version})
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Country
+          <input value={form.country} onChange={(ev) => set('country', ev.target.value)} placeholder="Switzerland" />
+        </label>
+        <label>
+          Location
+          <input value={form.location} onChange={(ev) => set('location', ev.target.value)} placeholder="Zurich / Oberglatt" />
+        </label>
+        <label>
+          Region code
+          <input value={form.region} onChange={(ev) => set('region', ev.target.value)} placeholder="CH-VD" />
+        </label>
+        <label>
+          Region name
+          <input value={form.region_label} onChange={(ev) => set('region_label', ev.target.value)} placeholder="Romandie / Lausanne" />
+        </label>
+        <label>
+          Material %
+          <input type="number" step="0.1" value={form.material} onChange={(ev) => set('material', ev.target.value)} />
+        </label>
+        <label>
+          Labour rates %
+          <input type="number" step="0.1" value={form.labour} onChange={(ev) => set('labour', ev.target.value)} />
+        </label>
+      </div>
+      <div className="pricebook-form-actions">
+        <Button primary type="submit">
+          Create price book
+        </Button>
+        <Button onClick={onCancel}>Cancel</Button>
+      </div>
+    </form>
+  )
+}
+
+function ImportPriceBookForm({
+  datasets,
+  busy,
+  onImport,
+  onCancel,
+}: {
+  datasets: { id: string; name: string }[]
+  busy: boolean
+  onImport: (body: {
+    name: string
+    country: string
+    location: string
+    region: string
+    currency: string
+    note: string
+    base_dataset: string
+    catalog: File
+    productivity: File
+    parameters?: File | null
+  }) => void
+  onCancel: () => void
+}) {
+  const [name, setName] = useState('')
+  const [country, setCountry] = useState('Switzerland')
+  const [location, setLocation] = useState('')
+  const [region, setRegion] = useState('')
+  const [currency, setCurrency] = useState('CHF')
+  const [note, setNote] = useState('')
+  const [base, setBase] = useState(datasets[0]?.id ?? '')
+  const [catalog, setCatalog] = useState<File | null>(null)
+  const [productivity, setProductivity] = useState<File | null>(null)
+  const [parameters, setParameters] = useState<File | null>(null)
+
+  return (
+    <form className="pricebook-form dataset-import-form" onSubmit={(ev) => {
+      ev.preventDefault()
+      if (!catalog || !productivity || !name.trim()) return
+      onImport({ name: name.trim(), country: country.trim(), location: location.trim(), region: region.trim(),
+        currency: currency.trim() || 'CHF', note: note.trim(), base_dataset: base, catalog, productivity, parameters })
+    }}>
+      <h4><FileUp size={15} /> Import a CSV dataset</h4>
+      <p className="muted">Use the same columns as the starter package. The catalogue and productivity files are validated before the dataset is created. Project parameters can be uploaded or inherited from an existing dataset.</p>
+      <div className="pricebook-form-grid">
+        <label>Name<input value={name} onChange={(e) => setName(e.target.value)} placeholder="Swiss HVAC 2027" required /></label>
+        <label>Country<input value={country} onChange={(e) => setCountry(e.target.value)} placeholder="Switzerland" /></label>
+        <label>Location<input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Zurich / Oberglatt" /></label>
+        <label>Region code<input value={region} onChange={(e) => setRegion(e.target.value)} placeholder="CH-ZH" /></label>
+        <label>Currency<input value={currency} onChange={(e) => setCurrency(e.target.value.toUpperCase())} maxLength={3} /></label>
+        <label>Parameters fallback<select value={base} onChange={(e) => setBase(e.target.value)}>{datasets.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</select></label>
+        <label>Catalogue CSV<input type="file" accept=".csv,text/csv" onChange={(e) => setCatalog(e.target.files?.[0] ?? null)} required /></label>
+        <label>Productivity CSV<input type="file" accept=".csv,text/csv" onChange={(e) => setProductivity(e.target.files?.[0] ?? null)} required /></label>
+        <label>Project parameters JSON (optional)<input type="file" accept=".json,application/json" onChange={(e) => setParameters(e.target.files?.[0] ?? null)} /></label>
+        <label>Notes<input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Supplier catalogue, effective January 2027" /></label>
+      </div>
+      <div className="dataset-file-summary">
+        <span className={catalog ? 'ready' : ''}>{catalog?.name || 'catalog.csv required'}</span>
+        <span className={productivity ? 'ready' : ''}>{productivity?.name || 'productivity.csv required'}</span>
+        <span className={parameters ? 'ready' : ''}>{parameters?.name || 'parameters inherited'}</span>
+      </div>
+      <div className="pricebook-form-actions">
+        <Button primary type="submit" disabled={busy || !catalog || !productivity || !name.trim()}>Import dataset</Button>
+        <Button onClick={onCancel}>Cancel</Button>
+      </div>
+    </form>
+  )
+}
+
+
+export function ActivityItem({ a }: { a: Activity }) {
+  return (
+    <div className="activity-item">
+      <div>
+        <p>{a.text}</p>
+        <small className="muted">{fmtWhen(a.at)}</small>
+      </div>
+    </div>
   )
 }

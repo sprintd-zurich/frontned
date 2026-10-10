@@ -1,33 +1,29 @@
 import { useEffect, useState } from 'react'
 import {
   AlertTriangle,
+  ArrowRight,
   Check,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
-  Database,
   HardHat,
-  HelpCircle,
   Info,
   MessageSquare,
-  Package,
   RotateCcw,
   Search,
   Send,
   ShieldCheck,
   Trash2,
 } from 'lucide-react'
-import { MATCH_LABEL, hasCompanyData, initials, needsDecision } from '../derive'
+import { initials, needsDecision } from '../derive'
 import { STATUS_META, STATUS_ORDER, fmtChf, fmtNum, fmtWhen, money, unit } from '../format'
 import { useEstimate, useStore } from '../store'
 import type { Position, Status } from '../types'
 import { ActivityItem } from '../pages/Overview'
 import { CostPanel, FACTOR_LABEL } from './CostPanel'
 import { SourceView } from './SourceView'
-import { Button, Modal, ProductGraphic, StatusBadge } from './ui'
-import { EditedTag, type Mode } from './PositionTable'
-import { SourceLine } from './Trace'
-import { Sources } from './Sources'
+import { Button, Modal, ProductGraphic, Ring, StatusBadge } from './ui'
+import type { Mode } from './PositionTable'
 
 const isFire = (p: { product_id?: string | null; install_code?: string | null }) =>
   !!(p.product_id?.startsWith('P-FIR') || p.install_code?.startsWith('FIRE'))
@@ -37,13 +33,16 @@ export function Detail({ p, mode, rows }: { p: Position; mode: Mode; rows: Posit
   const { override, select, addNote, deleteNote, checksFor } = useDetailActions()
   const busy = useStore((s) => s.busy)
   const rules = useStore((s) => s.rules)
-  const tabs = ['Proposal', 'Tender', 'Discussion', 'Alternatives', 'Technical', 'History', 'Source']
+  const tabs =
+    mode === 'calculation'
+      ? ['Calculation', 'Alternatives', 'History']
+      : ['AI Proposal', 'Source', 'Discussion', 'Alternatives', 'Technical', 'History']
   const [tab, setTab] = useState(tabs[0])
   const [note, setNote] = useState('')
   const [modal, setModal] = useState<'' | 'products' | 'rule'>('')
   const compact = mode === 'positions'
   useEffect(() => {
-    setTab('Proposal')
+    setTab(mode === 'calculation' ? 'Calculation' : 'AI Proposal')
     setNote('')
   }, [mode, p.lv_id])
 
@@ -76,14 +75,16 @@ export function Detail({ p, mode, rows }: { p: Position; mode: Mode; rows: Posit
           onBlur={(ev) => {
             const q = ev.target.value === '' ? null : Number(ev.target.value)
             if (q == null || q === p.quantity) return
-            if (Number.isFinite(q) && q >= 0) set({ quantity: q }, `${p.lv_id}: quantity set to ${fmtNum(q)} ${unit(p.unit)}.`)
+            if (Number.isFinite(q) && q >= 0) set({ quantity: q }, `${p.ref}: quantity set to ${fmtNum(q)} ${unit(p.unit)}.`)
             else ev.target.value = String(p.quantity ?? '')
           }}
           onKeyDown={(ev) => ev.key === 'Enter' && ev.currentTarget.blur()}
         />
         <span>{unit(p.unit)}</span>
       </div>
-      <SourceLine trace={p.trace.quantity} />
+      {p.extracted_quantity !== p.quantity && (
+        <small className="muted">Tender: {p.extracted_quantity == null ? 'not stated' : `${fmtNum(p.extracted_quantity)} ${unit(p.unit)}`}</small>
+      )}
     </label>
   )
   const product = (
@@ -96,7 +97,6 @@ export function Detail({ p, mode, rows }: { p: Position; mode: Mode; rows: Posit
       <ChevronRight size={17} />
     </button>
   )
-  const company = hasCompanyData(p)
   const rule = (
     <>
       <h4>Installation rule</h4>
@@ -112,16 +112,13 @@ export function Detail({ p, mode, rows }: { p: Position; mode: Mode; rows: Posit
         </span>
         <ChevronRight size={18} />
       </button>
-      <SourceLine trace={p.trace.base_hours_per_unit} />
     </>
   )
 
   return (
     <section className={`card detail-panel ${compact ? 'compact' : ''}`}>
       <div className="section-heading">
-        <h2>
-          Position {p.lv_id} <EditedTag p={p} />
-        </h2>
+        <h2>Position {p.ref}</h2>
         <div className="inline">
           {rows.length > 0 && (
             <small className="muted">
@@ -149,17 +146,14 @@ export function Detail({ p, mode, rows }: { p: Position; mode: Mode; rows: Posit
               {t}
               {t === 'Alternatives' && ` (${p.alternatives.length})`}
               {t === 'Discussion' && ` (${p.notes.length})`}
-              {t === 'Source' && p.sheets.length > 0 && ` (${p.sheets.length})`}
             </button>
           ))}
         </div>
       )}
 
       {tab === 'Alternatives' ? (
-        <Alternatives p={p} choose={(id) => set({ product_id: id }, `${p.lv_id}: product ${id} selected, price recalculated.`)} />
+        <Alternatives p={p} choose={(id) => set({ product_id: id }, `${p.ref}: product ${id} selected, price recalculated.`)} />
       ) : tab === 'Source' ? (
-        <Sources p={p} />
-      ) : tab === 'Tender' ? (
         <>
           <SourceView tenderId={e.tender.id} position={p} pages={e.tender.pages} zoomable />
           <div className="quote">
@@ -187,31 +181,15 @@ export function Detail({ p, mode, rows }: { p: Position; mode: Mode; rows: Posit
               </div>
             ))
           ) : (
-            <p className="muted">No notes yet. Record what you checked, what is missing or whom you asked.</p>
+            <p className="muted">No notes yet. Add your check below.</p>
           )}
-          <div className="notes-input">
-            <div className="inline">
-              <span className="avatar tiny">{initials(e.tender.meta.estimator)}</span>
-              <input
-                aria-label="New note"
-                value={note}
-                placeholder="Add a comment or note…"
-                onChange={(ev) => setNote(ev.target.value)}
-                onKeyDown={(ev) => ev.key === 'Enter' && save()}
-              />
-              <button className="icon-button" disabled={!note.trim()} aria-label="Save note" onClick={save}>
-                <Send size={16} />
-              </button>
-            </div>
-          </div>
         </div>
       ) : tab === 'History' ? (
         <div className="notes-history">
           <h3>Position history</h3>
           {history.length ? history.map((a, i) => <ActivityItem key={i} a={a} />) : <p className="muted">No changes since the import.</p>}
           <p className="notice subtle">
-            Proposal: {MATCH_LABEL[p.match_kind] ?? p.match_kind} ·{' '}
-            {p.edited ? `edited by the estimator (${p.edited_fields.join(', ').replace(/_chf|_/g, ' ')})` : 'not edited'}
+            Proposal: {p.match_kind} match · {p.overridden.length ? `edited: ${p.overridden.join(', ')}` : 'not edited'}
           </p>
         </div>
       ) : tab === 'Technical' ? (
@@ -221,68 +199,66 @@ export function Detail({ p, mode, rows }: { p: Position; mode: Mode; rows: Posit
         </>
       ) : (
         <>
-          <div className="description-block">
-            <div>
-              <h4>Description</h4>
-              <p>
-                <b>{p.title}</b>
-                {p.variant && ` · ${p.variant}`}
-              </p>
-              {p.description && p.description !== p.title && <p className="clamp">{p.description}</p>}
-            </div>
-          </div>
-          {company ? (
-            <div className="proposal-head ok">
-              <Database size={18} />
-              <span>
-                <strong>Proposal from company data</strong>
-                <small>
-                  {p.product_id ? p.trace.net_unit_cost_chf?.source : MATCH_LABEL[p.match_kind]}
-                  {p.match_kind === 'nearest' && ' (nearest item)'}
-                  {p.install_code && p.install_code !== 'UNKNOWN' && ` · rule ${p.install_code}`}
-                </small>
-              </span>
-            </div>
-          ) : (
-            <div className="proposal-head todo">
-              <AlertTriangle size={18} />
-              <span>
-                <strong>Position to review</strong>
-                <small>
-                  {p.quantity == null
-                    ? 'The tender gives no quantity for this item.'
-                    : p.match_kind === 'unknown'
-                      ? 'No matching item or price in the company data.'
-                      : (p.assumptions[0] ?? 'The company data does not cover this item completely.')}
-                </small>
-              </span>
-              <div className="review-options">
-                <Button className="small" onClick={() => setModal('products')}>
-                  <Package size={14} /> Choose a product
-                </Button>
-                {p.status !== 'supplier_quote_required' && (
-                  <Button className="small" onClick={() => set({ status: 'supplier_quote_required' }, `${p.lv_id} added to the Supplier tab.`)}>
-                    <MessageSquare size={14} /> Request supplier quote
-                  </Button>
-                )}
-                <Button className="small" onClick={() => setTab('Discussion')}>
-                  <HelpCircle size={14} /> Ask for information
-                </Button>
+          {mode !== 'calculation' && (
+            <div className="description-block">
+              <div>
+                <h4>Description</h4>
+                <p>
+                  <b>{p.title}</b>
+                  {p.variant && ` · ${p.variant}`}
+                </p>
+                {p.description && p.description !== p.title && <p className="clamp">{p.description}</p>}
               </div>
+              <Ring value={Math.round(p.match_confidence * 100)} size={compact ? 82 : 88} label="Match confidence" />
             </div>
+          )}
+          {mode === 'calculation' && (
+            <button className="product-selector large" onClick={() => setModal('products')}>
+              <ProductGraphic fire={isFire(p)} />
+              <span>
+                <strong>{p.product_id ?? 'No catalogue item'}</strong>
+                <span>{p.product_description ?? p.title}</span>
+                <small>{p.price_source?.replace(/_/g, ' ')}</small>
+                <span className="text-link">
+                  Change product <ArrowRight size={14} />
+                </span>
+              </span>
+            </button>
           )}
           <div className="quantity-product">
             {quantity}
             <div>
-              <h4>Selected product</h4>
-              {product}
+              {mode === 'calculation' ? (
+                <UnitCost p={p} onSave={(v) => set({ net_unit_cost_chf: v }, `${p.ref}: unit cost set to CHF ${money(v, 2)}.`)} />
+              ) : (
+                <>
+                  <h4>Selected product</h4>
+                  {product}
+                </>
+              )}
             </div>
           </div>
           {rule}
-          {!compact && (
+          {mode === 'calculation' ? (
+            <>
+              <div className="calc-embedded">
+                <CostPanel p={p} heading={false} />
+              </div>
+              <div className="confidence-card">
+                <Ring value={Math.round(p.match_confidence * 100)} size={80} label="Match" />
+                <div>
+                  <h3>{p.match_confidence >= 0.85 ? 'High confidence' : p.match_confidence >= 0.6 ? 'Check the match' : 'Low confidence'}</h3>
+                  <p>{p.assumptions[0] ?? 'Exact catalogue item and installation rule for this description.'}</p>
+                  <button className="text-button" onClick={() => setTab('Alternatives')}>
+                    View alternatives <ArrowRight size={14} />
+                  </button>
+                </div>
+              </div>
+            </>
+          ) : !compact ? (
             <div className="technical-grid">
               <section>
-                <h4>Read from the tender</h4>
+                <h4>AI extracted values</h4>
                 <small>From the tender, page {p.source_page}</small>
                 <Technical p={p} short />
               </section>
@@ -297,7 +273,7 @@ export function Detail({ p, mode, rows }: { p: Position; mode: Mode; rows: Posit
                 <ProductFacts id={p.product_id} />
               </section>
             </div>
-          )}
+          ) : null}
           {checks.length > 0 && (
             <div className={`validation ${checks.some((c) => c.level === 'warning') ? '' : 'calm'}`}>
               <h4>
@@ -311,48 +287,64 @@ export function Detail({ p, mode, rows }: { p: Position; mode: Mode; rows: Posit
               ))}
             </div>
           )}
-          <label className="status-select">
-            <h4>Status</h4>
-            <select
-              value={p.status}
-              onChange={(ev) => set({ status: ev.target.value as Status }, `${p.lv_id}: status set to ${STATUS_META[ev.target.value as Status].label}.`)}
-            >
-              {STATUS_ORDER.map((s) => (
-                <option key={s} value={s}>
-                  {STATUS_META[s].label}
-                </option>
-              ))}
-            </select>
-          </label>
-          {!compact && (
-            <div className="calc-embedded">
-              <h3 className="calc-title">Calculation</h3>
-              <UnitCost p={p} onSave={(v) => set({ net_unit_cost_chf: v }, `${p.lv_id}: unit cost set to CHF ${money(v, 2)}.`)} />
-              <CostPanel p={p} heading={false} />
-            </div>
+          {mode !== 'calculation' && (
+            <label className="status-select">
+              <h4>Status</h4>
+              <select
+                value={p.status}
+                onChange={(ev) => set({ status: ev.target.value as Status }, `${p.ref}: status set to ${STATUS_META[ev.target.value as Status].label}.`)}
+              >
+                {STATUS_ORDER.map((s) => (
+                  <option key={s} value={s}>
+                    {STATUS_META[s].label}
+                  </option>
+                ))}
+              </select>
+            </label>
           )}
         </>
       )}
 
+      <div className="notes-input">
+        <label htmlFor={`note-${mode}`}>
+          <h4>
+            Notes & comments <small>({p.notes.length})</small>
+          </h4>
+        </label>
+        {compact && p.notes.length > 0 && <p className="last-note">“{p.notes[p.notes.length - 1].text}”</p>}
+        <div className="inline">
+          <span className="avatar tiny">{initials(e.tender.meta.estimator)}</span>
+          <input
+            id={`note-${mode}`}
+            value={note}
+            placeholder="Add a comment or note…"
+            onChange={(ev) => setNote(ev.target.value)}
+            onKeyDown={(ev) => ev.key === 'Enter' && save()}
+          />
+          <button className="icon-button" disabled={!note.trim()} aria-label="Save note" onClick={save}>
+            <Send size={16} />
+          </button>
+        </div>
+      </div>
       <div className="detail-actions">
         {p.reviewed ? (
           <>
             <div className="approved-message">
               <CheckCircle2 size={16} /> Position approved
             </div>
-            <Button disabled={!!busy} onClick={() => set({ reviewed: false }, `${p.lv_id} reopened.`)}>
+            <Button disabled={!!busy} onClick={() => set({ reviewed: false }, `${p.ref} reopened.`)}>
               Reopen position
             </Button>
           </>
         ) : (
           <>
             {p.status !== 'supplier_quote_required' && (
-              <Button disabled={!!busy} onClick={() => set({ status: 'supplier_quote_required' }, `${p.lv_id} added to the Supplier tab.`)}>
+              <Button disabled={!!busy} onClick={() => set({ status: 'supplier_quote_required' }, `${p.ref} added to the supplier RFQs.`)}>
                 <MessageSquare size={14} /> Request quote
               </Button>
             )}
             {p.overridden.length > 0 && (
-              <Button disabled={!!busy} onClick={() => set({ reset: true }, `${p.lv_id} reset to the proposal.`)}>
+              <Button disabled={!!busy} onClick={() => set({ reset: true }, `${p.ref} reset to the proposal.`)}>
                 <RotateCcw size={14} /> Reset to proposal
               </Button>
             )}
@@ -361,7 +353,7 @@ export function Detail({ p, mode, rows }: { p: Position; mode: Mode; rows: Posit
               disabled={!!busy || p.quantity == null}
               title={p.quantity == null ? 'Enter a quantity first' : undefined}
               onClick={() => {
-                set({ reviewed: true }, `${p.lv_id} approved.`)
+                set({ reviewed: true }, `${p.ref} approved.`)
                 const next = rows.slice(index + 1).find((x) => !x.reviewed)
                 if (next && mode === 'review') select(next.lv_id)
               }}
@@ -369,7 +361,7 @@ export function Detail({ p, mode, rows }: { p: Position; mode: Mode; rows: Posit
               <Check size={16} /> Approve position
             </Button>
             {!needsDecision(p) && p.status !== 'review_required' && (
-              <button className="text-button" onClick={() => set({ status: 'review_required' }, `${p.lv_id} marked for review.`)}>
+              <button className="text-button" onClick={() => set({ status: 'review_required' }, `${p.ref} marked for review.`)}>
                 Mark for review
               </button>
             )}
@@ -381,7 +373,7 @@ export function Detail({ p, mode, rows }: { p: Position; mode: Mode; rows: Posit
           p={p}
           close={() => setModal('')}
           choose={(id) => {
-            set({ product_id: id }, `${p.lv_id}: product ${id} selected, price recalculated.`)
+            set({ product_id: id }, `${p.ref}: product ${id} selected, price recalculated.`)
             setModal('')
           }}
         />
@@ -391,7 +383,7 @@ export function Detail({ p, mode, rows }: { p: Position; mode: Mode; rows: Posit
           p={p}
           close={() => setModal('')}
           save={(b) => {
-            set(b, `${p.lv_id}: installation recalculated.`)
+            set(b, `${p.ref}: installation recalculated.`)
             setModal('')
           }}
         />
@@ -437,7 +429,6 @@ function UnitCost({ p, onSave }: { p: Position; onSave: (v: number) => void }) {
         />
         <span>/{unit(p.unit)}</span>
       </div>
-      <SourceLine trace={p.trace.net_unit_cost_chf} />
       <small className="muted">Unit price incl. labour: CHF {p.quantity ? money(p.direct_position_cost_chf / p.quantity, 2) : '—'}</small>
     </label>
   )
@@ -564,7 +555,7 @@ function ProductModal({ p, close, choose }: { p: Position; close: () => void; ch
     </button>
   )
   return (
-    <Modal title={`Product matching · ${p.lv_id}`} close={close} wide>
+    <Modal title={`Product matching · ${p.ref}`} close={close} wide>
       <p className="muted">
         {p.title}
         {p.variant && ` · ${p.variant}`}. Material and installation time are recalculated as soon as you pick a product.
@@ -651,7 +642,7 @@ function RuleModal({
         </label>
       </div>
       <div className="notice subtle">
-        <ShieldCheck size={16} /> Factors are project parameters; change them for all positions under Review → Project build-up.
+        <ShieldCheck size={16} /> Factors are project parameters; change them for all positions under Calculation → Project build-up.
       </div>
       <div className="modal-actions">
         <Button onClick={close}>Cancel</Button>

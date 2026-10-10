@@ -1,4 +1,5 @@
 import { useEffect, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 import { STATUS_META } from '../format'
 import type { Position } from '../types'
@@ -31,6 +32,7 @@ export function Button({
   disabled = false,
   title,
   type = 'button',
+  style,
 }: {
   children: ReactNode
   onClick?: () => void
@@ -39,9 +41,17 @@ export function Button({
   disabled?: boolean
   title?: string
   type?: 'button' | 'submit'
+  style?: React.CSSProperties
 }) {
   return (
-    <button type={type} title={title} disabled={disabled} className={`button ${primary ? 'primary' : ''} ${className}`} onClick={onClick}>
+    <button
+      type={type}
+      title={title}
+      disabled={disabled}
+      className={`button ${primary ? 'primary' : ''} ${className}`}
+      onClick={onClick}
+      style={style}
+    >
       {children}
     </button>
   )
@@ -76,7 +86,9 @@ export function Modal({ title, children, close, wide = false }: { title: string;
     document.querySelector<HTMLButtonElement>('.modal .icon-button')?.focus()
     return () => document.removeEventListener('keydown', h)
   }, [close])
-  return (
+  // Rendered into <body>: an ancestor with a backdrop-filter (the overview hero card) would
+  // otherwise become the containing block and squash the fixed-position backdrop.
+  return createPortal(
     <div className="modal-backdrop" onClick={close}>
       <section
         className={`modal ${wide ? 'wide' : ''}`}
@@ -108,7 +120,8 @@ export function Modal({ title, children, close, wide = false }: { title: string;
         </div>
         {children}
       </section>
-    </div>
+    </div>,
+    document.body,
   )
 }
 

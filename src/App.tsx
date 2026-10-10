@@ -1,42 +1,61 @@
 import { useEffect, useState } from 'react'
-import { Navigate, NavLink, useLocation, useNavigate } from 'react-router-dom'
+import { NavLink, Navigate, Outlet, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { AlertTriangle, ArrowRight, CheckCircle2, HelpCircle, Search, X } from 'lucide-react'
 import { initials } from './derive'
+import { HOME, type TenderPage, pageOf, tenderIdOf, tenderPath } from './routes'
 import { useStore } from './store'
 import { Button, Modal } from './components/ui'
-import { CategoryStrip } from './components/Shell'
-import { Overview, ProjectsSidebar } from './pages/Overview'
+import { ProjectsHome } from './pages/ProjectsHome'
+import { StructuredItems } from './pages/StructuredItems'
+import { MatchedItems } from './pages/MatchedItems'
+import { DirectCostsCalculation } from './pages/DirectCostsCalculation'
 import { Workspace } from './pages/Workspace'
 import { FaceToFace } from './pages/FaceToFace'
+import { Systems } from './pages/Systems'
 import { Bid } from './pages/Bid'
 import { Export } from './pages/Export'
-import { Supplier } from './pages/Supplier'
-import { Experience } from './pages/Experience'
+import { SupplierRFQ } from './pages/SupplierRFQ'
+import { Validation } from './pages/Validation'
 import { MetaForm } from './pages/MetaForm'
 
-const WORK = [
-  ['/positions', 'Positions'],
-  ['/review', 'Review'],
-  ['/supplier', 'Supplier'],
-  ['/experience', 'Experience'],
-  ['/bid', 'Bid'],
-  ['/export', 'Export'],
-] as const
+const NAV: { page: TenderPage; label: string }[] = [
+  { page: 'positions', label: 'Items' },
+  { page: 'matched', label: 'Product Matching' },
+  { page: 'rfq', label: 'Supplier Quotes' },
+  { page: 'calculation', label: 'Calculation' },
+  { page: 'bid', label: 'Bid' },
+  { page: 'validation', label: 'Validation' },
+  { page: 'export', label: 'Export' },
+]
+
+const LEGACY: Record<string, TenderPage> = {
+  '/positions': 'positions',
+  '/matched': 'matched',
+  '/calculation': 'calculation',
+  '/rfq': 'rfq',
+  '/bid': 'bid',
+  '/validation': 'validation',
+  '/export': 'export',
+  '/systems': 'systems',
+  '/face-to-face': 'face-to-face',
+  '/review': 'review',
+}
 
 export default function App() {
   const loc = useLocation()
   const navigate = useNavigate()
   const { estimate, ready, init, search, filter, toast, notify, error, busy } = useStore()
   const [modal, setModal] = useState<'' | 'help' | 'profile'>('')
-  const page = loc.pathname
-  const overview = page === '/' || !estimate
+  const tid = estimate?.tender.id ?? tenderIdOf(loc.pathname)
+  const page = pageOf(loc.pathname)
+  const atHome = loc.pathname === HOME
 
   useEffect(() => {
     init()
   }, [init])
   useEffect(() => {
     window.scrollTo(0, 0)
-  }, [page])
+  }, [loc.pathname])
   useEffect(() => {
     if (!toast) return
     const t = setTimeout(() => notify(''), 4200)
@@ -46,30 +65,45 @@ export default function App() {
   return (
     <>
       <header className="topbar">
-        <NavLink to="/" className="brand" aria-label="EQUANS projects">
+        <NavLink to={HOME} className="brand" aria-label="EQUANS home">
           EQUANS
         </NavLink>
-        <nav>
-          <NavLink to="/" end className={({ isActive }) => (isActive ? 'active' : '')}>
-            Projects
+        {tid && estimate && !atHome ? (
+          <NavLink to={HOME} className="project-crumb" title="Change project">
+            <span className="project-crumb-name">{estimate.tender.meta.project_name || estimate.tender.name}</span>
+            <span className="project-crumb-hint">Change project</span>
           </NavLink>
-          <span className="nav-split" aria-hidden />
-          {WORK.map(([url, label]) => (
-            <NavLink key={url} to={url} className={({ isActive }) => (isActive ? 'active' : '')}>
-              {label}
-            </NavLink>
-          ))}
-        </nav>
+        ) : (
+          <span className="project-crumb home-only">Projects</span>
+        )}
+        {tid && !atHome ? (
+          <nav>
+            {NAV.map(({ page: p, label }) => (
+              <NavLink
+                key={p}
+                to={tenderPath(tid, p)}
+                className={({ isActive }) =>
+                  isActive || (page === 'face-to-face' && p === 'positions') ? 'active' : ''
+                }
+              >
+                {label}
+              </NavLink>
+            ))}
+          </nav>
+        ) : (
+          <nav />
+        )}
         <label className="global-search">
           <Search size={18} />
           <input
             aria-label="Search positions"
             placeholder="Search positions, products, or keywords…"
             value={search}
-            disabled={!estimate}
+            disabled={!estimate || atHome}
             onChange={(e) => {
+              if (!tid) return
               filter({ search: e.target.value })
-              if (['/', '/export', '/bid', '/supplier', '/experience'].includes(page)) navigate('/positions')
+              if (page === 'export' || page === 'bid' || atHome) navigate(tenderPath(tid, 'positions'))
             }}
           />
         </label>
@@ -89,40 +123,39 @@ export default function App() {
           </button>
         </div>
       )}
-      <div className={`app ${overview ? 'dashboard-shell' : 'workspace-shell'}`}>
-        {overview ? (
-          <ProjectsSidebar />
-        ) : (
-          <CategoryStrip />
-        )}
-        <main className={overview ? 'dashboard-main' : `workspace-main ${['/bid', '/export', '/experience'].includes(page) ? '' : 'split'}`}>
-          {overview ? (
-            ready || estimate ? <Overview /> : <div className="loading-state"><span className="spinner" /> Connecting to the pricing API…</div>
-          ) : page === '/systems' ? (
-            <Navigate to="/bid" replace />
-          ) : page === '/bid' ? (
-            <Bid />
-          ) : page === '/export' ? (
-            <Export />
-          ) : page === '/supplier' ? (
-            <Supplier />
-          ) : page === '/experience' ? (
-            <Experience />
-          ) : page === '/review' ? (
-            <Workspace />
-          ) : page === '/calculation' ? (
-            <Navigate to="/review" replace />
+      <div className="app full-width">
+        <main className={atHome ? 'dashboard-main full-width' : 'workspace-main'}>
+          {!ready ? (
+            <div className="loading-state">
+              <span className="spinner" /> Connecting to the pricing API…
+            </div>
           ) : (
-            <FaceToFace />
+            <Routes>
+              <Route path="/" element={<ProjectsHome />} />
+              <Route path="/tenders/:tid" element={<TenderGate />}>
+                <Route index element={<Navigate to="positions" replace />} />
+                <Route path="positions" element={<StructuredItems />} />
+                <Route path="matched" element={<MatchedItems />} />
+                <Route path="calculation" element={<DirectCostsCalculation />} />
+                <Route path="rfq" element={<SupplierRFQ />} />
+                <Route path="bid" element={<Bid />} />
+                <Route path="validation" element={<Validation />} />
+                <Route path="export" element={<Export />} />
+                <Route path="systems" element={<Systems />} />
+                <Route path="face-to-face" element={<FaceToFace />} />
+                <Route path="review" element={<Workspace mode="review" />} />
+              </Route>
+              <Route path="*" element={<LegacyRedirect />} />
+            </Routes>
           )}
         </main>
       </div>
       <footer className="app-footer">
         <span>
-          <i /> Reference data: Equans starter package (catalogue, productivity, parameters) · every number traceable to the
-          tender page
+          <i /> Reference data: Equans starter package (catalogue, productivity, parameters) · every number
+          traceable to the tender page
         </span>
-        {estimate && <span className="muted">Tender {estimate.tender.id}</span>}
+        {estimate && !atHome && <span className="muted">Tender {estimate.tender.id}</span>}
       </footer>
       {toast && (
         <div className="toast" role="status">
@@ -135,23 +168,23 @@ export default function App() {
       )}
       {modal === 'help' && (
         <Modal title="From tender to a first price you can defend" close={() => setModal('')}>
-          <p>Import the tender PDF. Every step below works on the real extraction and prices.</p>
+          <p>Create a project from a tender PDF. Every step below then lives inside that project.</p>
           <ol className="guide">
-            <li>Positions: every LV line as read from the tender, next to the tender page with its source highlighted.</li>
-            <li>Review: each position matched against the company database and its prices. Where data is missing, review it, add the information or request a supplier quote, then approve.</li>
-            <li>Supplier: tick the items still missing a price, prepare the request mail and read prices from the product sheets suppliers send back.</li>
-            <li>Experience: opinions, estimates and files from the team, kept with the tender for later bid adjustments.</li>
-            <li>Bid: cost per system, the calculated price, then margins, win probability and saved scenarios.</li>
-            <li>Export: the positions next to the priced tender PDF and the offer workbook.</li>
+            <li>Home: upload a PDF or resume a saved tender. Price books stay company-wide.</li>
+            <li>Positions: every LV line with quantity, matched product, installation rule and price.</li>
+            <li>Review: decide the open positions, switch products, request quotes and approve.</li>
+            <li>Calculation: the cost of every position and the build-up to the selling price.</li>
+            <li>Bid: compare margins, win probability and saved scenarios.</li>
+            <li>Export: the priced tender PDF, the offer workbook and supplier RFQs.</li>
           </ol>
           <Button
             primary
             onClick={() => {
               setModal('')
-              navigate(estimate ? '/review' : '/')
+              navigate(estimate ? tenderPath(estimate.tender.id, 'calculation') : HOME)
             }}
           >
-            {estimate ? 'Open the review queue' : 'Import a tender'} <ArrowRight size={16} />
+            {estimate ? 'Open Calculation' : 'Create a project'} <ArrowRight size={16} />
           </Button>
         </Modal>
       )}
@@ -162,4 +195,62 @@ export default function App() {
       )}
     </>
   )
+}
+
+function TenderGate() {
+  const { tid } = useParams<{ tid: string }>()
+  const { estimate, open, error } = useStore()
+  const [wait, setWait] = useState(() => estimate?.tender.id !== tid)
+
+  useEffect(() => {
+    if (!tid) return
+    if (estimate?.tender.id === tid) {
+      setWait(false)
+      return
+    }
+    let live = true
+    setWait(true)
+    open(tid).finally(() => {
+      if (live) setWait(false)
+    })
+    return () => {
+      live = false
+    }
+  }, [tid, estimate?.tender.id, open])
+
+  if (wait) {
+    return (
+      <div className="loading-state">
+        <span className="spinner" /> Opening the tender…
+      </div>
+    )
+  }
+  if (!estimate || estimate.tender.id !== tid) {
+    return (
+      <div className="card" style={{ maxWidth: 520, margin: '48px auto', padding: '36px 28px', textAlign: 'center' }}>
+        <h2>This tender is not on this desk</h2>
+        <p className="muted" style={{ margin: '10px 0 20px' }}>
+          {error || 'It may have been removed, or the link is from another machine.'}
+        </p>
+        <NavLink className="button primary" to={HOME}>
+          Back to the tender desk
+        </NavLink>
+      </div>
+    )
+  }
+  return <Outlet />
+}
+
+/** Old bookmarks like /positions land in the last opened project, or on the desk. */
+function LegacyRedirect() {
+  const loc = useLocation()
+  const page = LEGACY[loc.pathname]
+  let last: string | null = null
+  try {
+    last = localStorage.getItem('equans-tender-id')
+  } catch {
+    /* ignore */
+  }
+  if (page && last) return <Navigate to={tenderPath(last, page)} replace />
+  return <Navigate to={HOME} replace />
 }
