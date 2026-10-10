@@ -35,6 +35,8 @@ export const hasCompanyData = (p: Position) =>
   !needsDecision(p) && p.quantity != null && p.match_kind !== 'unknown' && (!!p.product_id || (!!p.install_code && p.install_code !== 'UNKNOWN'))
 /** Everything an estimator still has to sign off before the offer goes out. */
 export const isBlocker = (p: Position) => isPriceable(p) && !p.reviewed
+/** open positions a person has to act on: a decision, missing information or a supplier to contact */
+export const needsHuman = (p: Position) => needsDecision(p) || (!p.reviewed && p.status === 'supplier_quote_required')
 export const isDuctList = (p: Position) => p.kind.startsWith('duct') || p.kind.startsWith('fitting')
 
 export function metrics(ps: Position[]) {

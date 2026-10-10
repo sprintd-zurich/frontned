@@ -12,6 +12,7 @@ import { Export } from './pages/Export'
 import { Supplier } from './pages/Supplier'
 import { Experience } from './pages/Experience'
 import { MetaForm } from './pages/MetaForm'
+import { BlockersButton } from './components/Blockers'
 
 const WORK = [
   ['/positions', 'Items'],
@@ -73,6 +74,7 @@ export default function App() {
           />
         </label>
         {busy && <span className="spinner" title={busy} aria-label={busy} />}
+        <BlockersButton />
         <button className="icon-button help" title="How it works" onClick={() => setModal('help')}>
           <HelpCircle />
         </button>

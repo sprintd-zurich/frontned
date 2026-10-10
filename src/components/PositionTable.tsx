@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { ArrowUpDown, ChevronLeft, ChevronRight, Search, SlidersHorizontal, X } from 'lucide-react'
 import { PILLS, PILL_TONE, isBlocker, isDuctList, needsDecision, pillMatch, systemsOf } from '../derive'
 import { STATUS_META, fmtNum, money, unit } from '../format'
@@ -122,6 +123,7 @@ export function EditedTag({ p }: { p: Position }) {
 export function PositionTable({ rows, mode = 'positions', limit = 8 }: { rows: Position[]; mode?: Mode; limit?: number }) {
   const e = useEstimate()
   const { selected, select, clearFilters } = useStore()
+  const navigate = useNavigate()
   const [page, setPage] = useState(0)
   const [sort, setSort] = useState(0)
   const [size, setSize] = useState(limit)
@@ -274,7 +276,7 @@ export function PositionTable({ rows, mode = 'positions', limit = 8 }: { rows: P
                       <td>{unit(p.unit)}</td>
                       <td className="product-cell">
                         {p.product_id ?? (p.install_code && p.install_code !== 'UNKNOWN' ? 'labour only' : '—')}
-                        {p.product_description && <small>{p.product_description}</small>}
+                        {p.product_description && !calc && <small>{p.product_description}</small>}
                       </td>
                       {calc ? (
                         <>
@@ -303,7 +305,20 @@ export function PositionTable({ rows, mode = 'positions', limit = 8 }: { rows: P
                         </>
                       )}
                       <td>
-                        <ChevronRight size={16} />
+                        {calc ? (
+                          <button
+                            className="button small row-review"
+                            onClick={(ev) => {
+                              ev.stopPropagation()
+                              select(p.lv_id)
+                              navigate('/review')
+                            }}
+                          >
+                            Review
+                          </button>
+                        ) : (
+                          <ChevronRight size={16} />
+                        )}
                       </td>
                     </>
                   )}
