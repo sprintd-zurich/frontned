@@ -36,7 +36,12 @@ export const api = {
   rfqs: (id: string) => call<RfqPackage[]>(`/api/tenders/${id}/rfqs`),
   rfqUrl: (id: string, key: string) => `${BASE}/api/tenders/${id}/rfqs/${key}.xlsx`,
   exportUrl: (id: string) => `${BASE}/api/tenders/${id}/export.xlsx`,
-  pricedLvUrl: (id: string) => `${BASE}/api/tenders/${id}/priced-lv.pdf`,
+  pricedLvUrl: (id: string, inline = false) => `${BASE}/api/tenders/${id}/priced-lv.pdf${inline ? '?inline=true' : ''}`,
+  pricedLvInfo: (id: string) =>
+    call<{ pages: number; filled: number; positions: number; total_chf: number; key: string }>(`/api/tenders/${id}/priced-lv/info`),
+  pricedLvPageUrl: (id: string, page: number, key: string) => `${BASE}/api/tenders/${id}/priced-lv/pages/${page}.png?v=${key}`,
+  exportPreview: (id: string) =>
+    call<{ name: string; rows: (string | number | boolean | null)[][] }[]>(`/api/tenders/${id}/export/preview`),
   catalog: () => call<CatalogItem[]>('/api/reference/catalog'),
   pageUrl: (id: string, page: number) => `${BASE}/api/tenders/${id}/pages/${page}.png`,
 }

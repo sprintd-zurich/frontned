@@ -8,6 +8,7 @@ import { BuildUpView } from './components/BuildUpView'
 import { BidView } from './components/BidView'
 import { RfqView } from './components/RfqView'
 import { ChecksView } from './components/ChecksView'
+import { PreviewModal, type PreviewKind } from './components/PreviewModal'
 
 export default function App() {
   const [estimate, setEstimate] = useState<Estimate | null>(null)
@@ -16,6 +17,8 @@ export default function App() {
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [only, setOnly] = useState<{ label: string; ids: string[] } | null>(null)
+  const [preview, setPreview] = useState<PreviewKind | null>(null)
+  const closePreview = useCallback(() => setPreview(null), [])
 
   const run = useCallback(async (label: string, fn: () => Promise<Estimate>) => {
     setBusy(label)
@@ -63,12 +66,14 @@ export default function App() {
         tab={tab}
         onTab={setTab}
         busy={busy}
+        onPreview={setPreview}
         onHome={() => {
           setEstimate(null)
           history.replaceState(null, '', location.pathname)
         }}
       />
       {error && <div className="banner error">{error}</div>}
+      {preview && <PreviewModal kind={preview} tenderId={estimate.tender.id} onClose={closePreview} />}
       {tab === 'positions' && (
         <PositionsView estimate={estimate} catalog={catalog} onOverride={override} only={only} onClearOnly={() => setOnly(null)} />
       )}
