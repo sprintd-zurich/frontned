@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { AlertTriangle, Bot, Lightbulb, MessageSquareQuote, Paperclip, Percent, Sparkles, Trash2, TrendingUp } from 'lucide-react'
+import { AlertTriangle, Bot, Lightbulb, MessageSquareQuote, Paperclip, Percent, Sparkles, Trash2 } from 'lucide-react'
 import { api } from '../api'
 import { initials, systemsOf } from '../derive'
 import { fmtChf, fmtWhen } from '../format'
@@ -28,8 +28,6 @@ export function Experience() {
   const e = useEstimate()
   const [kind, setKind] = useState<Entry['kind'] | 'all'>('all')
   const entries = [...e.experience].reverse().filter((x) => kind === 'all' || x.kind === kind)
-  const estimates = e.experience.filter((x) => x.adjustment_pct != null)
-  const net = estimates.reduce((s, x) => s + (x.adjustment_pct ?? 0), 0)
   const usedIds = new Set(e.bid_suggestion?.entries_used.map((u) => u.id) ?? [])
   return (
     <div className="experience-page">
@@ -70,36 +68,6 @@ export function Experience() {
             <Empty icon={<Lightbulb size={28} />} title="No experience recorded yet">
               Add what you would tell a colleague pricing this tender for the first time.
             </Empty>
-          )}
-        </section>
-        <section className="card experience-preview">
-          <h2>
-            <TrendingUp size={18} /> Suggested adjustments
-          </h2>
-          <p className="muted">Collected from the estimates. Not applied to the price yet.</p>
-          {estimates.length ? (
-            <>
-              {estimates.map((x) => (
-                <div className="adjustment-row" key={x.id}>
-                  <span>{x.text || x.file?.name}</span>
-                  <small>{scopeLabel(x)}</small>
-                  <b className={(x.adjustment_pct ?? 0) >= 0 ? 'up' : 'down'}>
-                    {(x.adjustment_pct ?? 0) > 0 ? '+' : ''}
-                    {x.adjustment_pct}%
-                  </b>
-                </div>
-              ))}
-              <div className="adjustment-row total">
-                <span>Sum of suggestions</span>
-                <small />
-                <b className={net >= 0 ? 'up' : 'down'}>
-                  {net > 0 ? '+' : ''}
-                  {Math.round(net * 10) / 10}%
-                </b>
-              </div>
-            </>
-          ) : (
-            <p className="muted">An estimate with a percentage shows up here.</p>
           )}
         </section>
       </div>
