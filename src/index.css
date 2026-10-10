@@ -245,6 +245,7 @@ details { margin-top: 8px; font-size: 13px; }
 
 /* export + RFQs */
 .btn.export { margin-left: 12px; text-decoration: none; background: var(--green); color: var(--navy); border: none; font-weight: 600; }
+.btn.export.secondary { margin-left: 8px; background: transparent; color: inherit; border: 1px solid currentColor; font-weight: 500; }
 .rfq-item { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
 .rfq-actions { display: flex; gap: 10px; }
 .rfq-actions .btn { text-decoration: none; }

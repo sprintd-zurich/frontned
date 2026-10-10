@@ -53,8 +53,16 @@ export function Header({ estimate, tab, onTab, busy, onHome }: Props) {
           </button>
         </nav>
         <div className="busy">{busy && <span className="spinner small" />}</div>
-        <a className="btn export" href={api.exportUrl(estimate.tender.id)} download>
-          Export offer (Excel)
+        <a
+          className="btn export"
+          href={api.pricedLvUrl(estimate.tender.id)}
+          download
+          title="The tender PDF with unit prices, amounts and all totals filled in"
+        >
+          Priced tender (PDF)
+        </a>
+        <a className="btn export secondary" href={api.exportUrl(estimate.tender.id)} download>
+          Offer (Excel)
         </a>
       </div>
       <div className="kpis">
