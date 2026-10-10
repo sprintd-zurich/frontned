@@ -22,7 +22,7 @@ import {
   Upload,
   UserRound,
 } from 'lucide-react'
-import { initials, isBlocker, lastOf, metrics, workflow } from '../derive'
+import { initials, isBlocker, lastOf, metrics, workflow, type Pill } from '../derive'
 import { fmtChf, fmtDate, fmtWhen, money, parseDay } from '../format'
 import { api } from '../api'
 import { useEstimate, useStore } from '../store'
@@ -224,7 +224,7 @@ function Dashboard() {
     ['Needs review', m.decision, '#ff7929', () => go('decision', '/review')],
     ['Open', m.open - m.decision, '#a7afbd', () => go('all', '/positions')],
   ]
-  function go(pill: string, url: string) {
+  function go(pill: Pill, url: string) {
     filter({ pill, system: 'all', search: '', only: null })
     navigate(url)
   }
