@@ -1,4 +1,4 @@
-import type { CatalogItem, Estimate, Parameters, PositionOverride } from './types'
+import type { CatalogItem, Estimate, Parameters, PositionOverride, RfqPackage } from './types'
 
 const BASE = import.meta.env.VITE_API_URL ?? ''
 
@@ -33,6 +33,9 @@ export const api = {
   saveSnapshot: (id: string, name: string) => call<Estimate>(`/api/tenders/${id}/snapshots`, json('POST', { name })),
   deleteSnapshot: (id: string, sid: string) => call<Estimate>(`/api/tenders/${id}/snapshots/${sid}`, { method: 'DELETE' }),
   applySnapshot: (id: string, sid: string) => call<Estimate>(`/api/tenders/${id}/snapshots/${sid}/apply`, { method: 'POST' }),
+  rfqs: (id: string) => call<RfqPackage[]>(`/api/tenders/${id}/rfqs`),
+  rfqUrl: (id: string, key: string) => `${BASE}/api/tenders/${id}/rfqs/${key}.xlsx`,
+  exportUrl: (id: string) => `${BASE}/api/tenders/${id}/export.xlsx`,
   catalog: () => call<CatalogItem[]>('/api/reference/catalog'),
   pageUrl: (id: string, page: number) => `${BASE}/api/tenders/${id}/pages/${page}.png`,
 }

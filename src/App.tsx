@@ -6,6 +6,7 @@ import { Header, type Tab } from './components/Header'
 import { PositionsView } from './components/PositionsView'
 import { BuildUpView } from './components/BuildUpView'
 import { BidView } from './components/BidView'
+import { RfqView } from './components/RfqView'
 
 export default function App() {
   const [estimate, setEstimate] = useState<Estimate | null>(null)
@@ -68,6 +69,7 @@ export default function App() {
       {error && <div className="banner error">{error}</div>}
       {tab === 'positions' && <PositionsView estimate={estimate} catalog={catalog} onOverride={override} />}
       {tab === 'buildup' && <BuildUpView estimate={estimate} onParams={setParams} />}
+      {tab === 'rfq' && <RfqView estimate={estimate} />}
       {tab === 'bid' && (
         <BidView
           estimate={estimate}

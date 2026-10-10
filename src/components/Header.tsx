@@ -1,7 +1,8 @@
 import type { Estimate } from '../types'
 import { fmtChf } from '../format'
+import { api } from '../api'
 
-export type Tab = 'positions' | 'buildup' | 'bid'
+export type Tab = 'positions' | 'buildup' | 'bid' | 'rfq'
 
 interface Props {
   estimate: Estimate
@@ -42,8 +43,14 @@ export function Header({ estimate, tab, onTab, busy, onHome }: Props) {
           <button className={tab === 'bid' ? 'active' : ''} onClick={() => onTab('bid')}>
             Bid decision
           </button>
+          <button className={tab === 'rfq' ? 'active' : ''} onClick={() => onTab('rfq')}>
+            Supplier RFQs
+          </button>
         </nav>
         <div className="busy">{busy && <span className="spinner small" />}</div>
+        <a className="btn export" href={api.exportUrl(estimate.tender.id)} download>
+          Export offer (Excel)
+        </a>
       </div>
       <div className="kpis">
         <Kpi label="Positions found" value={String(ps.length)} sub={`${priceable.length} priceable`} />
