@@ -1551,7 +1551,7 @@ tr.approved-row td:nth-child(2) {
 @media (min-width: 1101px) {
   .app.workspace-shell:has(> .workspace-main.split) {
     height: calc(100vh - 65px);
-    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
     padding-bottom: 38px;
   }
   .workspace-main.split {
@@ -3038,4 +3038,144 @@ body.resizing img {
   .hero-status {
     width: auto;
   }
+}
+
+/* ---------- the tender as one scrollable document ---------- */
+.pdf-pages {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.pdf-page {
+  flex-shrink: 0;
+}
+.pdf-page img {
+  aspect-ratio: auto 1 / 1.414;
+}
+.pdf-page.pickable {
+  cursor: pointer;
+}
+.pdf-page-no {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  font-size: 10px;
+  color: #6e83a2;
+  background: #ffffffd0;
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+.hl-hover {
+  position: absolute;
+  border-radius: 3px;
+  pointer-events: none;
+  background: #1389ff12;
+  border: 1.5px dashed #1389ff99;
+}
+.hl-hover b {
+  position: absolute;
+  top: -17px;
+  left: -1px;
+  font-size: 10px;
+  background: #1389ff;
+  color: #fff;
+  border-radius: 3px;
+  padding: 1px 5px;
+  font-style: normal;
+}
+.page-jump input {
+  width: 46px;
+  text-align: center;
+  border: 1px solid #dce3ee;
+  border-radius: 6px;
+  padding: 4px;
+  font-size: 12px;
+}
+.doc-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+.doc-heading small {
+  font-size: 11px;
+  color: #6e83a2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+}
+
+/* ---------- table filters: trades (solid, square) above statuses (tinted, round) ---------- */
+.filters-block .category-strip,
+.card > .category-strip {
+  margin-bottom: 8px;
+}
+.status-pills button {
+  --tone: #476391;
+  --tone-bg: #f0f2f6;
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  color: var(--tone);
+  background: var(--tone-bg);
+  border-color: color-mix(in srgb, var(--tone) 22%, #fff);
+  font-weight: 600;
+}
+.status-pills button::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--tone);
+  margin-right: 6px;
+}
+.status-pills button.tone-neutral::before {
+  display: none;
+}
+.status-pills button.tone-warning {
+  --tone: #e76717;
+  --tone-bg: #fff0e6;
+}
+.status-pills button.tone-violet {
+  --tone: #6a45cf;
+  --tone-bg: #f1edfd;
+}
+.status-pills button.tone-amber {
+  --tone: #b97800;
+  --tone-bg: #fff7e0;
+}
+.status-pills button.tone-info {
+  --tone: #0475ed;
+  --tone-bg: #eaf4ff;
+}
+.status-pills button.tone-success {
+  --tone: #00846a;
+  --tone-bg: #eaf8f3;
+}
+.status-pills button.tone-danger {
+  --tone: #d92d3f;
+  --tone-bg: #fdecee;
+}
+.status-pills button.tone-neutral {
+  --tone: #08266a;
+}
+.status-pills button.active {
+  color: #fff;
+  background: var(--tone);
+  border-color: var(--tone);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--tone) 25%, #fff);
+}
+.status-pills button.active::before {
+  background: #fff;
+}
+.status-pills button:hover:not(.active) {
+  border-color: var(--tone);
+}
+.card > .category-strip {
+  flex-wrap: wrap;
+  overflow: visible;
 }

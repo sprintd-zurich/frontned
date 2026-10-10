@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { ArrowUpDown, ChevronLeft, ChevronRight, Search, SlidersHorizontal, X } from 'lucide-react'
-import { PILLS, isBlocker, isDuctList, needsDecision, pillMatch, systemsOf } from '../derive'
+import { PILLS, PILL_TONE, isBlocker, isDuctList, needsDecision, pillMatch, systemsOf } from '../derive'
 import { STATUS_META, fmtNum, money, unit } from '../format'
 import { useEstimate, useStore } from '../store'
 import type { Position } from '../types'
 import { Button, StatusBadge } from './ui'
 import { Traced } from './Trace'
+import { CategoryStrip } from './Shell'
 
 export type Mode = 'positions' | 'review' | 'calculation'
 
@@ -45,10 +46,11 @@ export function Filters({ review = false }: { review?: boolean }) {
   const sections = [...new Set(e.positions.map((p) => p.section ?? ''))].filter(Boolean).sort()
   return (
     <>
+      <CategoryStrip />
       <div className="filters">
-        <div className="filter-pills">
+        <div className="filter-pills status-pills">
           {PILLS.map(([k, label]) => (
-            <button key={k} onClick={() => s.filter({ pill: k })} className={s.pill === k ? 'active' : ''}>
+            <button key={k} onClick={() => s.filter({ pill: k })} className={`tone-${PILL_TONE[k]} ${s.pill === k ? 'active' : ''}`}>
               {review && k === 'all' ? 'Open' : label} <span>{base.filter((p) => pillMatch(p, k)).length}</span>
             </button>
           ))}
@@ -140,6 +142,11 @@ export function PositionTable({ rows, mode = 'positions', limit = 8 }: { rows: P
     const i = ordered.findIndex((p) => p.lv_id === selected)
     if (i >= 0) setPage((pg) => (Math.floor(i / size) === pg ? pg : Math.floor(i / size)))
   }, [selected, ordered, size])
+  const body = useRef<HTMLTableSectionElement>(null)
+  // a selection made elsewhere (a click on the tender page) scrolls its row into view
+  useEffect(() => {
+    body.current?.querySelector('tr.selected')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+  }, [selected, page])
   const visible = ordered.slice(page * size, page * size + size)
   const calc = mode === 'calculation'
   const read = mode === 'positions'
@@ -210,7 +217,7 @@ export function PositionTable({ rows, mode = 'positions', limit = 8 }: { rows: P
               </tr>
             )}
           </thead>
-          <tbody>
+          <tbody ref={body}>
             {visible.map((p) => {
               const c = cats[p.category]
               return (

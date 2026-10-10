@@ -75,6 +75,10 @@ export const api = {
   catalog: () => call<CatalogItem[]>('/api/reference/catalog'),
   productivity: () => call<ProductivityRule[]>('/api/reference/productivity'),
   pageUrl: (id: string, page: number) => `${BASE}/api/tenders/${id}/pages/${page}.png`,
+  pagePositions: (id: string, page: number) =>
+    call<{ lv_id: string; block: { x0: number; y0: number; x1: number; y1: number } | null; lines: { x0: number; y0: number; x1: number; y1: number }[] }[]>(
+      `/api/tenders/${id}/pages/${page}/positions`,
+    ),
   /** a path the backend returned (trace links, files) as a full URL */
   href: (path: string) => `${BASE}${path}`,
   supplierItems: (id: string) => call<SupplierItem[]>(`/api/tenders/${id}/supplier/items`),

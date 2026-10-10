@@ -1,11 +1,9 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { ArrowRight, FileCheck2, FileText } from 'lucide-react'
+import { FileCheck2, FileText } from 'lucide-react'
 import { api } from '../api'
 import { useEstimate, useStore } from '../store'
 import { Filters, PositionTable, useFiltered } from '../components/PositionTable'
-import { SourceView } from '../components/SourceView'
-import { Button } from '../components/ui'
+import { PdfScroller } from '../components/PdfScroller'
 import { Split } from '../components/Split'
 
 type PricedInfo = Awaited<ReturnType<typeof api.pricedLvInfo>>
@@ -16,10 +14,8 @@ type PricedInfo = Awaited<ReturnType<typeof api.pricedLvInfo>>
  */
 export function FaceToFace({ priced = false }: { priced?: boolean }) {
   const e = useEstimate()
-  const navigate = useNavigate()
-  const { selected } = useStore()
+  const { selected, select, filter } = useStore()
   const filtered = useFiltered()
-  const [samePage, setSamePage] = useState(false)
   const [info, setInfo] = useState<PricedInfo | null>(null)
   const [failed, setFailed] = useState('')
   useEffect(() => {
@@ -35,7 +31,12 @@ export function FaceToFace({ priced = false }: { priced?: boolean }) {
     }
   }, [priced, e])
   const p = e.positions.find((x) => x.lv_id === selected) ?? filtered[0] ?? e.positions[0]
-  const rows = samePage && p ? filtered.filter((x) => x.source_pages.includes(p.source_page)) : filtered
+  const rows = filtered
+  // a click on the tender page selects its item; filters that would hide it are cleared first
+  const pick = (lvId: string) => {
+    if (!filtered.some((x) => x.lv_id === lvId)) filter({ pill: 'all', category: 'all', system: 'all', section: 'all', search: '', only: null, hideDucts: false })
+    select(lvId)
+  }
   return (
     <Split
       className={`face-layout ${priced ? 'priced' : ''}`}
@@ -43,36 +44,28 @@ export function FaceToFace({ priced = false }: { priced?: boolean }) {
         <section className="card">
           <div className="section-heading">
             <div className="inline">
-              <h2>{priced ? 'Priced positions' : 'LV Positions'}</h2>
-              <span className="subtitle">{rows.length} positions</span>
+              <h2>{priced ? 'Priced items' : 'Items'}</h2>
+              <span className="subtitle">{rows.length} items</span>
             </div>
-            {!priced && (
-              <Button onClick={() => navigate('/review')}>
-                Review selected <ArrowRight size={16} />
-              </Button>
-            )}
           </div>
-          <label className="check-field same-page">
-            <input type="checkbox" checked={samePage} onChange={(ev) => setSamePage(ev.target.checked)} />
-            Only positions from page {p?.source_page}
-          </label>
           <Filters />
-          <PositionTable rows={rows} mode={priced ? 'calculation' : 'positions'} limit={10} />
+          <PositionTable rows={rows} mode={priced ? 'calculation' : 'positions'} limit={50} />
         </section>
       }
       right={
         <section className="card face-document">
           <div className="section-heading">
-            <h2>{priced ? 'Priced tender' : 'Original tender'}</h2>
+            <div className="doc-heading">
+              <h2>{priced ? 'Priced tender' : 'Original tender'}</h2>
+              <small title={e.tender.name}>
+                {priced ? <FileCheck2 size={13} /> : <FileText size={13} />} {e.tender.name}
+              </small>
+            </div>
             {priced && info && (
               <small className="muted">
                 {info.filled} of {info.positions} positions priced in the PDF
               </small>
             )}
-          </div>
-          <div className="document-file">
-            {priced ? <FileCheck2 size={18} /> : <FileText size={18} />} {e.tender.name}
-            <small>· {p ? `${p.lv_id} ${p.title}` : ''}</small>
           </div>
           {failed ? (
             <p className="muted">The priced tender could not be built: {failed}</p>
@@ -81,15 +74,13 @@ export function FaceToFace({ priced = false }: { priced?: boolean }) {
               <span className="spinner" /> Writing the prices into the tender…
             </div>
           ) : (
-            p && (
-              <SourceView
-                tenderId={e.tender.id}
-                position={p}
-                pages={e.tender.pages}
-                zoomable
-                priced={priced && info ? { key: info.key, pages: info.pages } : undefined}
-              />
-            )
+            <PdfScroller
+              tenderId={e.tender.id}
+              position={p}
+              pages={e.tender.pages}
+              onPick={pick}
+              priced={priced && info ? { key: info.key, pages: info.pages } : undefined}
+            />
           )}
         </section>
       }

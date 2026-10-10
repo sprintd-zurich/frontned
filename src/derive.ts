@@ -65,6 +65,17 @@ export const PILLS = [
 ] as const
 export type Pill = (typeof PILLS)[number][0]
 
+/** the colour of each status filter is the colour of its status tag in the table */
+export const PILL_TONE: Record<string, string> = {
+  all: 'neutral',
+  decision: 'warning',
+  supplier: 'violet',
+  assumption: 'amber',
+  calculated: 'info',
+  approved: 'success',
+}
+
+
 export function pillMatch(p: Position, pill: Pill) {
   switch (pill) {
     case 'all':
