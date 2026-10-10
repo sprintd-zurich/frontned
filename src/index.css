@@ -242,3 +242,12 @@ details { margin-top: 8px; font-size: 13px; }
 .delta { font-size: 12px; }
 .delta.up, .delta.down { color: var(--muted); }
 @media (max-width: 900px) { .scenarios { grid-template-columns: 1fr; } }
+
+/* export + RFQs */
+.btn.export { margin-left: 12px; text-decoration: none; background: var(--green); color: var(--navy); border: none; font-weight: 600; }
+.rfq-item { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+.rfq-actions { display: flex; gap: 10px; }
+.rfq-actions .btn { text-decoration: none; }
+.rfq-text-title { margin: 18px 16px 8px; }
+.rfq-text { margin: 0 16px 24px; padding: 14px 16px; background: var(--muted-bg); border-radius: 8px; white-space: pre-wrap;
+  font-size: 13px; line-height: 1.55; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }

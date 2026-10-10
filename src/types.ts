@@ -148,3 +148,15 @@ export interface PositionOverride {
   reviewed?: boolean
   reset?: boolean
 }
+
+export interface RfqPackage {
+  key: string
+  title: string
+  subject: string
+  positions: number
+  budget_chf: number
+  unpriced: number
+  pages: number[]
+  lines: { lv_id: string; system: string; text: string; quantity: number | null; unit: string; source_page: number }[]
+  text: string
+}
