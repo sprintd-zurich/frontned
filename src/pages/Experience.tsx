@@ -1,11 +1,12 @@
 import { useRef, useState } from 'react'
-import { AlertTriangle, Bot, Lightbulb, MessageSquareQuote, Paperclip, Percent, Sparkles, Trash2 } from 'lucide-react'
+import { AlertTriangle, Bot, Keyboard, Lightbulb, MessageSquareQuote, Mic, Paperclip, Percent, Sparkles, Trash2 } from 'lucide-react'
 import { api } from '../api'
 import { initials, systemsOf } from '../derive'
 import { fmtChf, fmtWhen } from '../format'
 import { useEstimate, useStore } from '../store'
 import type { BidSuggestion, Estimate, Experience as Entry } from '../types'
 import { Button, Empty } from '../components/ui'
+import { Talk } from './Talk'
 
 const KINDS = [
   ['opinion', 'Opinion', MessageSquareQuote],
@@ -24,11 +25,30 @@ const SCOPES = [
  * The estimators' own experience for this tender: opinions, estimates with a suggested adjustment, and files.
  * Kept with the tender so it can later adjust the bid scenarios from history and experience; prices are not changed yet.
  */
+const MODE = 'equans-experience-mode'
+function savedMode(): 'talk' | 'write' {
+  try {
+    return localStorage.getItem(MODE) === 'talk' ? 'talk' : 'write'
+  } catch {
+    return 'write'
+  }
+}
+
 export function Experience() {
-  const e = useEstimate()
-  const [kind, setKind] = useState<Entry['kind'] | 'all'>('all')
-  const entries = [...e.experience].reverse().filter((x) => kind === 'all' || x.kind === kind)
-  const usedIds = new Set(e.bid_suggestion?.entries_used.map((u) => u.id) ?? [])
+  const act = useStore((s) => s.act)
+  const [mode, setModeState] = useState(savedMode)
+  const setMode = (m: 'talk' | 'write') => {
+    setModeState(m)
+    try {
+      localStorage.setItem(MODE, m)
+    } catch {
+      /* the mode then lasts for this visit */
+    }
+  }
+  const suggest = async () => {
+    const ok = await act('Asking Apertus…', (tid) => api.suggestBid(tid), 'Apertus suggested a bid price.')
+    if (ok) document.getElementById('bid-suggestion')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
   return (
     <div className="experience-page">
       <section className="card experience-intro">
@@ -49,30 +69,54 @@ export function Experience() {
           </span>
         </div>
       </section>
+      <div className="mode-toggle" role="tablist" aria-label="How to add experience">
+        <button role="tab" aria-selected={mode === 'talk'} className={mode === 'talk' ? 'active' : ''} onClick={() => setMode('talk')}>
+          <Mic size={15} /> Talk
+        </button>
+        <button role="tab" aria-selected={mode === 'write'} className={mode === 'write' ? 'active' : ''} onClick={() => setMode('write')}>
+          <Keyboard size={15} /> Write
+        </button>
+      </div>
       <div className="experience-grid">
-        <NewEntry />
-        <section className="card">
-          <div className="section-heading">
-            <h2>Entries</h2>
-            <div className="filter-pills">
-              {[['all', 'All'] as const, ...KINDS.map(([k, l]) => [k, l] as const)].map(([k, l]) => (
-                <button key={k} className={kind === k ? 'active' : ''} onClick={() => setKind(k)}>
-                  {l} ({k === 'all' ? e.experience.length : e.experience.filter((x) => x.kind === k).length})
-                </button>
-              ))}
-            </div>
-          </div>
-          {entries.length ? (
-            entries.map((x) => <EntryRow key={x.id} x={x} used={usedIds.has(x.id)} />)
-          ) : (
-            <Empty icon={<Lightbulb size={28} />} title="No experience recorded yet">
-              Add what you would tell a colleague pricing this tender for the first time.
-            </Empty>
-          )}
-        </section>
+        {/* both stay mounted so the conversation survives switching back and forth */}
+        <div hidden={mode !== 'talk'}>
+          <Talk onSuggest={suggest} />
+        </div>
+        <div hidden={mode !== 'write'}>
+          <NewEntry />
+        </div>
+        <Entries />
       </div>
       <SuggestionPanel />
     </div>
+  )
+}
+
+function Entries() {
+  const e = useEstimate()
+  const [kind, setKind] = useState<Entry['kind'] | 'all'>('all')
+  const entries = [...e.experience].reverse().filter((x) => kind === 'all' || x.kind === kind)
+  const usedIds = new Set(e.bid_suggestion?.entries_used.map((u) => u.id) ?? [])
+  return (
+    <section className="card">
+      <div className="section-heading">
+        <h2>Entries</h2>
+        <div className="filter-pills">
+          {[['all', 'All'] as const, ...KINDS.map(([k, l]) => [k, l] as const)].map(([k, l]) => (
+            <button key={k} className={kind === k ? 'active' : ''} onClick={() => setKind(k)}>
+              {l} ({k === 'all' ? e.experience.length : e.experience.filter((x) => x.kind === k).length})
+            </button>
+          ))}
+        </div>
+      </div>
+      {entries.length ? (
+        entries.map((x) => <EntryRow key={x.id} x={x} used={usedIds.has(x.id)} />)
+      ) : (
+        <Empty icon={<Lightbulb size={28} />} title="No experience recorded yet">
+          Add what you would tell a colleague pricing this tender for the first time.
+        </Empty>
+      )}
+    </section>
   )
 }
 
@@ -117,7 +161,7 @@ function SuggestionPanel() {
   }
   const stale = s ? staleness(e, s) : null
   return (
-    <section className="card suggestion">
+    <section className="card suggestion" id="bid-suggestion">
       <div className="suggestion-head">
         <div>
           <span className="ai-badge">
@@ -305,6 +349,11 @@ function EntryRow({ x, used }: { x: Entry; used: boolean }) {
             {scopeLabel(x)} · {x.author ? `${x.author} · ` : ''}
             {fmtWhen(x.at)}
           </small>
+          {x.source === 'talk' && (
+            <span className="talk-tag" title="Saved from a spoken conversation">
+              <Mic size={11} /> talk
+            </span>
+          )}
           {used && (
             <span className="used-tag" title="Used by the latest bid suggestion">
               <Bot size={11} /> used
@@ -312,6 +361,7 @@ function EntryRow({ x, used }: { x: Entry; used: boolean }) {
           )}
         </div>
         {x.text && <p>{x.text}</p>}
+        {x.quote && <q className="entry-quote">{x.quote}</q>}
         {x.adjustment_pct != null && (
           <small className="muted">
             Suggested adjustment {x.adjustment_pct > 0 ? '+' : ''}

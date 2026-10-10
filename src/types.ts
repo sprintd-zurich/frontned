@@ -126,6 +126,27 @@ export interface Experience {
   adjustment_pct: number | null
   author: string | null
   file: { name: string; stored: string } | null
+  /** 'talk' when it came from a spoken conversation; quote is what was said */
+  source?: 'talk' | 'write'
+  quote?: string | null
+}
+
+export interface TalkEntry {
+  kind: 'opinion' | 'estimate'
+  text: string
+  adjustment_pct: number | null
+  scope: 'project' | 'system' | 'category'
+  ref: string
+  quote: string
+}
+
+export interface TalkTurn {
+  transcript: string
+  reply: string
+  entries: TalkEntry[]
+  model: string | null
+  audio: string | null
+  speech_error: string | null
 }
 
 export interface BidSuggestion {
@@ -326,6 +347,7 @@ export interface Estimate {
   experience: Experience[]
   bid_suggestion: BidSuggestion | null
   suggestion_service: { configured: boolean; model: string }
+  voice_service: { configured: boolean }
 }
 
 export interface CatalogItem {

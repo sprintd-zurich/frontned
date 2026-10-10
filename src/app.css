@@ -2593,3 +2593,224 @@ body.resizing img {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* ---------- experience: talk / write ---------- */
+.mode-toggle {
+  display: inline-grid;
+  grid-template-columns: 1fr 1fr;
+  justify-self: start;
+  padding: 4px;
+  border-radius: 999px;
+  background: white;
+  border: 1px solid #dfe5ef;
+  box-shadow: 0 1px 2px rgba(8, 38, 106, 0.06);
+}
+.mode-toggle button {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  justify-content: center;
+  min-width: 120px;
+  padding: 8px 18px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: #4c648b;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+}
+.mode-toggle button.active {
+  background: #08266a;
+  color: white;
+}
+.talk {
+  display: grid;
+  gap: 12px;
+}
+.talk-head {
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+.talk-head h2 {
+  margin: 6px 0 4px;
+}
+.talk-head p {
+  margin: 0;
+}
+.talk-log {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-height: 260px;
+  max-height: 460px;
+  overflow: auto;
+  padding: 12px;
+  border-radius: 10px;
+  background: #f6f8fc;
+}
+.talk-start {
+  display: grid;
+  place-items: center;
+  min-height: 230px;
+}
+.talk-msg {
+  display: grid;
+  gap: 6px;
+  max-width: 88%;
+}
+.talk-msg.user {
+  justify-self: end;
+}
+.talk-msg.assistant {
+  justify-self: start;
+}
+.talk-bubble {
+  padding: 9px 12px;
+  border-radius: 12px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+.talk-msg.user .talk-bubble {
+  background: #08266a;
+  color: white;
+  border-bottom-right-radius: 4px;
+}
+.talk-msg.assistant .talk-bubble {
+  background: white;
+  border: 1px solid #e6ebf3;
+  border-bottom-left-radius: 4px;
+}
+.talk-bubble.typing {
+  color: #6881a4;
+  font-style: italic;
+}
+.talk-entry {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: white;
+  border: 1px dashed #b9a8f7;
+}
+.talk-entry p {
+  margin: 0;
+  font-size: 13px;
+}
+.talk-entry q,
+.entry-quote {
+  display: block;
+  font-size: 11px;
+  color: #6881a4;
+  font-style: italic;
+}
+.talk-entry .experience-meta b {
+  margin-left: auto;
+  font-size: 12px;
+}
+.talk-entry b.up {
+  color: #c0392b;
+}
+.talk-entry b.down {
+  color: #00876c;
+}
+.talk-entry.saved {
+  border-style: solid;
+  border-color: #9bd8c6;
+}
+.talk-entry.dismissed {
+  opacity: 0.5;
+}
+.talk-entry-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 2px;
+}
+.talk-input {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.talk-input input {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid #dfe5ef;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 13px;
+}
+.talk-input input:focus {
+  outline: 2px solid #c9bdfa;
+  border-color: #7b5cf0;
+}
+.talk-mic {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 0;
+  background: #7b5cf0;
+  color: white;
+  cursor: pointer;
+}
+.talk-mic:disabled {
+  background: #c9d2e1;
+  cursor: not-allowed;
+}
+.talk-mic.on {
+  background: #c0392b;
+  animation: mic-pulse 1.2s ease-in-out infinite;
+}
+@keyframes mic-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(192, 57, 43, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(192, 57, 43, 0);
+  }
+}
+.talk-recording {
+  flex: 1;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 12px;
+  color: #c0392b;
+}
+.talk-recording i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #c0392b;
+}
+.talk-foot {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+.talk-tag {
+  display: inline-flex;
+  gap: 3px;
+  align-items: center;
+  font-size: 9px;
+  font-weight: 700;
+  border-radius: 10px;
+  padding: 2px 7px;
+  background: #fde8f0;
+  color: #b0285f;
+}
+@media (max-width: 1100px) {
+  .mode-toggle {
+    justify-self: stretch;
+  }
+  .talk-msg {
+    max-width: 100%;
+  }
+}

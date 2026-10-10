@@ -6,6 +6,7 @@ import type {
   PositionOverride,
   RfqPackage,
   SupplierDraft,
+  TalkTurn,
   SupplierItem,
   SourceLocation,
   TenderSummary,
@@ -100,6 +101,14 @@ export const api = {
     return call<Estimate>(`/api/tenders/${id}/experience`, { method: 'POST', body: form })
   },
   deleteExperience: (id: string, eid: string) => call<Estimate>(`/api/tenders/${id}/experience/${eid}`, { method: 'DELETE' }),
+  talk: (id: string, turn: { audio?: Blob | null; text?: string; history: { role: string; text: string }[]; speak: boolean }) => {
+    const form = new FormData()
+    if (turn.audio) form.append('audio', turn.audio, `speech.${turn.audio.type.includes('mp4') ? 'mp4' : 'webm'}`)
+    if (turn.text) form.append('text', turn.text)
+    form.append('history', JSON.stringify(turn.history))
+    form.append('speak', String(turn.speak))
+    return call<TalkTurn>(`/api/tenders/${id}/talk`, { method: 'POST', body: form })
+  },
   suggestBid: (id: string) => call<Estimate>(`/api/tenders/${id}/experience/suggest`, { method: 'POST' }),
   experienceFileUrl: (id: string, eid: string) => `${BASE}/api/tenders/${id}/experience/${eid}/file`,
 }
