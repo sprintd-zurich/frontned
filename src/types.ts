@@ -42,9 +42,36 @@ export interface Position {
   hourly_rate_chf: number | null
   base_hours_per_unit: number | null
   overridden: string[]
+  /** stays true once the estimator changed anything on the position, even after a reset */
+  edited: boolean
+  edited_fields: string[]
+  category: string
+  /** where each number comes from, keyed by field */
+  trace: Partial<Record<TraceField, Trace>>
   reviewed: boolean
   notes: Note[]
   alternatives: Alternative[]
+}
+
+export type TraceField =
+  | 'quantity'
+  | 'net_unit_cost_chf'
+  | 'material_cost_chf'
+  | 'base_hours_per_unit'
+  | 'adjusted_install_hours'
+  | 'hourly_rate_chf'
+  | 'labour_cost_chf'
+  | 'direct_position_cost_chf'
+
+export interface Trace {
+  source: string
+  lines: string[]
+}
+
+export interface Category {
+  id: string
+  label: string
+  color: string
 }
 
 export interface Note {
@@ -193,6 +220,7 @@ export interface Snapshot {
 export interface Estimate {
   tender: { id: string; name: string; pages: number; reviewed: string[]; created_at: string; meta: Meta }
   positions: Position[]
+  categories: Category[]
   project: Project
   parameters: Parameters
   bid: BidAnalysis

@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from 'react'
-import { ArrowUpDown, Check, ChevronLeft, ChevronRight, RotateCcw, Search, SlidersHorizontal, X } from 'lucide-react'
+import { useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { ArrowUpDown, ChevronLeft, ChevronRight, Search, SlidersHorizontal, X } from 'lucide-react'
 import { PILLS, isBlocker, isDuctList, needsDecision, pillMatch, systemsOf } from '../derive'
 import { STATUS_META, fmtNum, money, unit } from '../format'
 import { useEstimate, useStore } from '../store'
 import type { Position } from '../types'
 import { Button, StatusBadge } from './ui'
+import { Traced } from './Trace'
 
 export type Mode = 'positions' | 'review' | 'calculation'
 
@@ -16,6 +17,7 @@ function baseFilter(ps: Position[], s: ReturnType<typeof useStore.getState>, rev
       (!review || s.pill === 'approved' || isBlocker(p)) &&
       (!s.only || s.only.ids.includes(p.lv_id)) &&
       (s.system === 'all' || p.system === s.system) &&
+      (s.category === 'all' || p.category === s.category) &&
       (s.section === 'all' || p.section === s.section) &&
       (!s.hideDucts || !isDuctList(p)) &&
       (!q ||
@@ -105,12 +107,23 @@ export function Filters({ review = false }: { review?: boolean }) {
 
 const SORTS = ['Pos. No.', 'Description', 'Price ↓'] as const
 
+/** "edited" stays on a position once the estimator changed anything on it. */
+export function EditedTag({ p }: { p: Position }) {
+  if (!p.edited) return null
+  return (
+    <span className="edited-tag" title={`Changed by the estimator: ${p.edited_fields.map((f) => f.replace(/_chf|_/g, ' ').trim()).join(', ')}`}>
+      edited
+    </span>
+  )
+}
+
 export function PositionTable({ rows, mode = 'positions', limit = 8 }: { rows: Position[]; mode?: Mode; limit?: number }) {
-  const { selected, select, clearFilters, bulk, busy } = useStore()
+  const e = useEstimate()
+  const { selected, select, clearFilters } = useStore()
   const [page, setPage] = useState(0)
   const [sort, setSort] = useState(0)
-  const [checked, setChecked] = useState<string[]>([])
   const [size, setSize] = useState(limit)
+  const sorts = mode === 'positions' ? SORTS.slice(0, 2) : SORTS
   const ids = rows.map((p) => p.lv_id).join(',')
   useEffect(() => setPage(0), [ids, size, sort])
   const ordered = useMemo(
@@ -129,163 +142,167 @@ export function PositionTable({ rows, mode = 'positions', limit = 8 }: { rows: P
   }, [selected, ordered, size])
   const visible = ordered.slice(page * size, page * size + size)
   const calc = mode === 'calculation'
-  const act = async (body: Parameters<typeof bulk>[1], done: string) => {
-    await bulk(checked, body, done)
-    setChecked([])
-  }
+  const read = mode === 'positions'
+  const cats = Object.fromEntries(e.categories.map((c) => [c.id, c]))
   return (
     <>
       <div className="table-toolbar">
         <span>
-          {rows.length} positions · CHF {money(rows.reduce((s, p) => s + p.direct_position_cost_chf, 0))} direct cost
+          {rows.length} positions
+          {!read && <> · CHF {money(rows.reduce((s, p) => s + p.direct_position_cost_chf, 0))} direct cost</>}
+          {read && ' as read from the tender'}
         </span>
-        <button className="text-button" onClick={() => setSort((sort + 1) % SORTS.length)}>
-          <ArrowUpDown size={13} /> {SORTS[sort]}
+        <button className="text-button" onClick={() => setSort((sort + 1) % sorts.length)}>
+          <ArrowUpDown size={13} /> {sorts[sort]}
         </button>
       </div>
-      {checked.length > 0 && (
-        <div className="bulk-bar">
-          <b>{checked.length} selected</b>
-          <Button className="small" primary disabled={!!busy} onClick={() => act({ reviewed: true }, `${checked.length} positions approved.`)}>
-            <Check size={14} /> Approve
-          </Button>
-          <Button className="small" disabled={!!busy} onClick={() => act({ reviewed: false }, `${checked.length} positions reopened.`)}>
-            <RotateCcw size={14} /> Reopen
-          </Button>
-          <Button
-            className="small"
-            disabled={!!busy}
-            onClick={() => act({ status: 'supplier_quote_required' }, `${checked.length} positions added to the supplier RFQs.`)}
-          >
-            Request quote
-          </Button>
-          <button className="text-button" onClick={() => setChecked([])}>
-            Clear
-          </button>
-        </div>
-      )}
       <div className="table-scroll">
-        <table className={`position-table ${calc ? 'calculation-table' : ''}`}>
+        <table className={`position-table ${calc ? 'calculation-table' : ''} ${read ? 'reading-table' : ''}`}>
           <thead>
-            <tr>
-              <th>
-                <input
-                  type="checkbox"
-                  aria-label="Select visible positions"
-                  checked={visible.length > 0 && visible.every((p) => checked.includes(p.lv_id))}
-                  onChange={(e) =>
-                    setChecked(
-                      e.target.checked
-                        ? [...new Set([...checked, ...visible.map((p) => p.lv_id)])]
-                        : checked.filter((id) => !visible.some((p) => p.lv_id === id)),
-                    )
-                  }
-                />
-              </th>
-              <th>Pos.</th>
-              <th>Description</th>
-              <th className="num">Quantity</th>
-              <th>Unit</th>
-              <th>Product</th>
-              {calc ? (
-                <>
-                  <th className="num">
-                    Material
-                    <br />
-                    (CHF)
-                  </th>
-                  <th className="num">Hours</th>
-                  <th className="num">
-                    Labour
-                    <br />
-                    (CHF)
-                  </th>
-                  <th className="num">
-                    Total
-                    <br />
-                    (CHF)
-                  </th>
-                  <th className="num">
-                    Unit price
-                    <br />
-                    (CHF)
-                  </th>
-                </>
-              ) : (
-                <>
-                  {mode === 'review' && <th>Issue</th>}
-                  <th>Status</th>
-                  {mode !== 'review' && <th className="num">Price (CHF)</th>}
-                </>
-              )}
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {visible.map((p) => (
-              <tr
-                tabIndex={0}
-                aria-selected={selected === p.lv_id}
-                key={p.lv_id}
-                className={`${selected === p.lv_id ? 'selected' : ''} ${p.reviewed ? 'approved-row' : ''}`}
-                onClick={() => select(p.lv_id)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault()
-                    select(p.lv_id)
-                  }
-                }}
-              >
-                <td>
-                  <input
-                    type="checkbox"
-                    aria-label={`Select ${p.lv_id}`}
-                    checked={checked.includes(p.lv_id)}
-                    onClick={(e) => e.stopPropagation()}
-                    onChange={(e) => setChecked(e.target.checked ? [...checked, p.lv_id] : checked.filter((id) => id !== p.lv_id))}
-                  />
-                </td>
-                <td className="pos-cell">
-                  {p.lv_id}
-                  <small>p. {p.source_page}</small>
-                </td>
-                <td className="description-cell">
-                  {p.title}
-                  {p.overridden.length > 0 && <span className="edited-tag">edited</span>}
-                  {p.variant && <small>{p.variant}</small>}
-                </td>
-                <td className="num">{fmtNum(p.quantity)}</td>
-                <td>{unit(p.unit)}</td>
-                <td className="product-cell">
-                  {p.product_id ?? (p.install_code && p.install_code !== 'UNKNOWN' ? 'labour only' : '—')}
-                  {p.product_description && <small>{p.product_description}</small>}
-                </td>
+            {read ? (
+              <tr>
+                <th>LV ID</th>
+                <th>System</th>
+                <th className="num">Page</th>
+                <th>Category</th>
+                <th>Description</th>
+                <th className="num">Quantity</th>
+                <th>Unit</th>
+              </tr>
+            ) : (
+              <tr>
+                <th>Pos.</th>
+                <th>Description</th>
+                <th className="num">Quantity</th>
+                <th>Unit</th>
+                <th>Product</th>
                 {calc ? (
                   <>
-                    <td className="num">{money(p.material_cost_chf)}</td>
-                    <td className="num">{fmtNum(p.adjusted_install_hours)}</td>
-                    <td className="num">{money(p.labour_cost_chf)}</td>
-                    <td className="num">
-                      <b>{money(p.direct_position_cost_chf)}</b>
-                    </td>
-                    <td className="num">{p.quantity ? money(p.direct_position_cost_chf / p.quantity, 2) : '—'}</td>
+                    <th className="num">
+                      Material
+                      <br />
+                      (CHF)
+                    </th>
+                    <th className="num">Hours</th>
+                    <th className="num">
+                      Labour
+                      <br />
+                      (CHF)
+                    </th>
+                    <th className="num">
+                      Total
+                      <br />
+                      (CHF)
+                    </th>
+                    <th className="num">
+                      Unit price
+                      <br />
+                      (CHF)
+                    </th>
                   </>
                 ) : (
                   <>
-                    {mode === 'review' && (
-                      <td className="issue-cell">{p.assumptions[0] ?? STATUS_META[p.status].help}</td>
-                    )}
-                    <td>
-                      <StatusBadge p={p} />
-                    </td>
-                    {mode !== 'review' && <td className="num">{p.direct_position_cost_chf ? money(p.direct_position_cost_chf) : '—'}</td>}
+                    <th>Issue</th>
+                    <th>Status</th>
                   </>
                 )}
-                <td>
-                  <ChevronRight size={16} />
-                </td>
+                <th />
               </tr>
-            ))}
+            )}
+          </thead>
+          <tbody>
+            {visible.map((p) => {
+              const c = cats[p.category]
+              return (
+                <tr
+                  tabIndex={0}
+                  aria-selected={selected === p.lv_id}
+                  key={p.lv_id}
+                  className={`${selected === p.lv_id ? 'selected' : ''} ${p.reviewed ? 'approved-row' : ''}`}
+                  onClick={() => select(p.lv_id)}
+                  onKeyDown={(ev) => {
+                    if (ev.key === 'Enter' || ev.key === ' ') {
+                      ev.preventDefault()
+                      select(p.lv_id)
+                    }
+                  }}
+                >
+                  {read ? (
+                    <>
+                      <td className="pos-cell">
+                        {p.lv_id}
+                        <EditedTag p={p} />
+                      </td>
+                      <td className="system-cell" title={p.system}>
+                        {systemsOf([p])[0]?.code}
+                        <small>{systemsOf([p])[0]?.name}</small>
+                      </td>
+                      <td className="num">{p.source_page}</td>
+                      <td>
+                        {c && (
+                          <span className="category-tag" style={{ '--cat': c.color } as CSSProperties}>
+                            {c.label}
+                          </span>
+                        )}
+                      </td>
+                      <td className="description-cell">
+                        {p.title}
+                        {p.variant && <small>{p.variant}</small>}
+                      </td>
+                      <td className="num">{fmtNum(p.quantity)}</td>
+                      <td>{unit(p.unit)}</td>
+                    </>
+                  ) : (
+                    <>
+                      <td className="pos-cell">
+                        {p.lv_id}
+                        <small>p. {p.source_page}</small>
+                      </td>
+                      <td className="description-cell">
+                        {p.title}
+                        <EditedTag p={p} />
+                        {p.variant && <small>{p.variant}</small>}
+                      </td>
+                      <td className="num">{fmtNum(p.quantity)}</td>
+                      <td>{unit(p.unit)}</td>
+                      <td className="product-cell">
+                        {p.product_id ?? (p.install_code && p.install_code !== 'UNKNOWN' ? 'labour only' : '—')}
+                        {p.product_description && <small>{p.product_description}</small>}
+                      </td>
+                      {calc ? (
+                        <>
+                          <td className="num">
+                            <Traced trace={p.trace.material_cost_chf}>{money(p.material_cost_chf)}</Traced>
+                          </td>
+                          <td className="num">
+                            <Traced trace={p.trace.adjusted_install_hours}>{fmtNum(p.adjusted_install_hours)}</Traced>
+                          </td>
+                          <td className="num">
+                            <Traced trace={p.trace.labour_cost_chf}>{money(p.labour_cost_chf)}</Traced>
+                          </td>
+                          <td className="num">
+                            <Traced trace={p.trace.direct_position_cost_chf}>
+                              <b>{money(p.direct_position_cost_chf)}</b>
+                            </Traced>
+                          </td>
+                          <td className="num">{p.quantity ? money(p.direct_position_cost_chf / p.quantity, 2) : '—'}</td>
+                        </>
+                      ) : (
+                        <>
+                          <td className="issue-cell">{p.assumptions[0] ?? STATUS_META[p.status].help}</td>
+                          <td>
+                            <StatusBadge p={p} />
+                          </td>
+                        </>
+                      )}
+                      <td>
+                        <ChevronRight size={16} />
+                      </td>
+                    </>
+                  )}
+                </tr>
+              )
+            })}
           </tbody>
         </table>
         {!rows.length && (
@@ -314,7 +331,7 @@ export function PositionTable({ rows, mode = 'positions', limit = 8 }: { rows: P
             <ChevronRight size={17} />
           </button>
         </div>
-        <select aria-label="Positions per page" value={size} onChange={(e) => setSize(+e.target.value)}>
+        <select aria-label="Positions per page" value={size} onChange={(ev) => setSize(+ev.target.value)}>
           {[5, 8, 10, 20, 50, 100].map((n) => (
             <option key={n} value={n}>
               {n} per page

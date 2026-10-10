@@ -5,24 +5,28 @@ import {
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
+  Database,
   HardHat,
+  HelpCircle,
   Info,
   MessageSquare,
+  Package,
   RotateCcw,
   Search,
   Send,
   ShieldCheck,
   Trash2,
 } from 'lucide-react'
-import { initials, needsDecision } from '../derive'
+import { MATCH_LABEL, hasCompanyData, initials, needsDecision } from '../derive'
 import { STATUS_META, STATUS_ORDER, fmtChf, fmtNum, fmtWhen, money, unit } from '../format'
 import { useEstimate, useStore } from '../store'
 import type { Position, Status } from '../types'
 import { ActivityItem } from '../pages/Overview'
 import { CostPanel, FACTOR_LABEL } from './CostPanel'
 import { SourceView } from './SourceView'
-import { Button, Modal, ProductGraphic, Ring, StatusBadge } from './ui'
-import type { Mode } from './PositionTable'
+import { Button, Modal, ProductGraphic, StatusBadge } from './ui'
+import { EditedTag, type Mode } from './PositionTable'
+import { SourceLine } from './Trace'
 
 const isFire = (p: { product_id?: string | null; install_code?: string | null }) =>
   !!(p.product_id?.startsWith('P-FIR') || p.install_code?.startsWith('FIRE'))
@@ -32,13 +36,13 @@ export function Detail({ p, mode, rows }: { p: Position; mode: Mode; rows: Posit
   const { override, select, addNote, deleteNote, checksFor } = useDetailActions()
   const busy = useStore((s) => s.busy)
   const rules = useStore((s) => s.rules)
-  const tabs = ['AI Proposal', 'Source', 'Discussion', 'Alternatives', 'Technical', 'History']
+  const tabs = ['Proposal', 'Source', 'Discussion', 'Alternatives', 'Technical', 'History']
   const [tab, setTab] = useState(tabs[0])
   const [note, setNote] = useState('')
   const [modal, setModal] = useState<'' | 'products' | 'rule'>('')
   const compact = mode === 'positions'
   useEffect(() => {
-    setTab('AI Proposal')
+    setTab('Proposal')
     setNote('')
   }, [mode, p.lv_id])
 
@@ -78,9 +82,7 @@ export function Detail({ p, mode, rows }: { p: Position; mode: Mode; rows: Posit
         />
         <span>{unit(p.unit)}</span>
       </div>
-      {p.extracted_quantity !== p.quantity && (
-        <small className="muted">Tender: {p.extracted_quantity == null ? 'not stated' : `${fmtNum(p.extracted_quantity)} ${unit(p.unit)}`}</small>
-      )}
+      <SourceLine trace={p.trace.quantity} />
     </label>
   )
   const product = (
@@ -93,6 +95,7 @@ export function Detail({ p, mode, rows }: { p: Position; mode: Mode; rows: Posit
       <ChevronRight size={17} />
     </button>
   )
+  const company = hasCompanyData(p)
   const rule = (
     <>
       <h4>Installation rule</h4>
@@ -108,13 +111,16 @@ export function Detail({ p, mode, rows }: { p: Position; mode: Mode; rows: Posit
         </span>
         <ChevronRight size={18} />
       </button>
+      <SourceLine trace={p.trace.base_hours_per_unit} />
     </>
   )
 
   return (
     <section className={`card detail-panel ${compact ? 'compact' : ''}`}>
       <div className="section-heading">
-        <h2>Position {p.lv_id}</h2>
+        <h2>
+          Position {p.lv_id} <EditedTag p={p} />
+        </h2>
         <div className="inline">
           {rows.length > 0 && (
             <small className="muted">
@@ -177,15 +183,31 @@ export function Detail({ p, mode, rows }: { p: Position; mode: Mode; rows: Posit
               </div>
             ))
           ) : (
-            <p className="muted">No notes yet. Add your check below.</p>
+            <p className="muted">No notes yet. Record what you checked, what is missing or whom you asked.</p>
           )}
+          <div className="notes-input">
+            <div className="inline">
+              <span className="avatar tiny">{initials(e.tender.meta.estimator)}</span>
+              <input
+                aria-label="New note"
+                value={note}
+                placeholder="Add a comment or note…"
+                onChange={(ev) => setNote(ev.target.value)}
+                onKeyDown={(ev) => ev.key === 'Enter' && save()}
+              />
+              <button className="icon-button" disabled={!note.trim()} aria-label="Save note" onClick={save}>
+                <Send size={16} />
+              </button>
+            </div>
+          </div>
         </div>
       ) : tab === 'History' ? (
         <div className="notes-history">
           <h3>Position history</h3>
           {history.length ? history.map((a, i) => <ActivityItem key={i} a={a} />) : <p className="muted">No changes since the import.</p>}
           <p className="notice subtle">
-            Proposal: {p.match_kind} match · {p.overridden.length ? `edited: ${p.overridden.join(', ')}` : 'not edited'}
+            Proposal: {MATCH_LABEL[p.match_kind] ?? p.match_kind} ·{' '}
+            {p.edited ? `edited by the estimator (${p.edited_fields.join(', ').replace(/_chf|_/g, ' ')})` : 'not edited'}
           </p>
         </div>
       ) : tab === 'Technical' ? (
@@ -204,8 +226,47 @@ export function Detail({ p, mode, rows }: { p: Position; mode: Mode; rows: Posit
               </p>
               {p.description && p.description !== p.title && <p className="clamp">{p.description}</p>}
             </div>
-            <Ring value={Math.round(p.match_confidence * 100)} size={compact ? 82 : 88} label="Match confidence" />
           </div>
+          {company ? (
+            <div className="proposal-head ok">
+              <Database size={18} />
+              <span>
+                <strong>Proposal from company data</strong>
+                <small>
+                  {p.product_id ? p.trace.net_unit_cost_chf?.source : MATCH_LABEL[p.match_kind]}
+                  {p.match_kind === 'nearest' && ' (nearest item)'}
+                  {p.install_code && p.install_code !== 'UNKNOWN' && ` · rule ${p.install_code}`}
+                </small>
+              </span>
+            </div>
+          ) : (
+            <div className="proposal-head todo">
+              <AlertTriangle size={18} />
+              <span>
+                <strong>Position to review</strong>
+                <small>
+                  {p.quantity == null
+                    ? 'The tender gives no quantity for this item.'
+                    : p.match_kind === 'unknown'
+                      ? 'No matching item or price in the company data.'
+                      : (p.assumptions[0] ?? 'The company data does not cover this item completely.')}
+                </small>
+              </span>
+              <div className="review-options">
+                <Button className="small" onClick={() => setModal('products')}>
+                  <Package size={14} /> Choose a product
+                </Button>
+                {p.status !== 'supplier_quote_required' && (
+                  <Button className="small" onClick={() => set({ status: 'supplier_quote_required' }, `${p.lv_id} added to the supplier RFQs.`)}>
+                    <MessageSquare size={14} /> Request supplier quote
+                  </Button>
+                )}
+                <Button className="small" onClick={() => setTab('Discussion')}>
+                  <HelpCircle size={14} /> Ask for information
+                </Button>
+              </div>
+            </div>
+          )}
           <div className="quantity-product">
             {quantity}
             <div>
@@ -217,7 +278,7 @@ export function Detail({ p, mode, rows }: { p: Position; mode: Mode; rows: Posit
           {!compact && (
             <div className="technical-grid">
               <section>
-                <h4>AI extracted values</h4>
+                <h4>Read from the tender</h4>
                 <small>From the tender, page {p.source_page}</small>
                 <Technical p={p} short />
               </section>
@@ -269,27 +330,6 @@ export function Detail({ p, mode, rows }: { p: Position; mode: Mode; rows: Posit
         </>
       )}
 
-      <div className="notes-input">
-        <label htmlFor={`note-${mode}`}>
-          <h4>
-            Notes & comments <small>({p.notes.length})</small>
-          </h4>
-        </label>
-        {compact && p.notes.length > 0 && <p className="last-note">“{p.notes[p.notes.length - 1].text}”</p>}
-        <div className="inline">
-          <span className="avatar tiny">{initials(e.tender.meta.estimator)}</span>
-          <input
-            id={`note-${mode}`}
-            value={note}
-            placeholder="Add a comment or note…"
-            onChange={(ev) => setNote(ev.target.value)}
-            onKeyDown={(ev) => ev.key === 'Enter' && save()}
-          />
-          <button className="icon-button" disabled={!note.trim()} aria-label="Save note" onClick={save}>
-            <Send size={16} />
-          </button>
-        </div>
-      </div>
       <div className="detail-actions">
         {p.reviewed ? (
           <>
@@ -393,6 +433,7 @@ function UnitCost({ p, onSave }: { p: Position; onSave: (v: number) => void }) {
         />
         <span>/{unit(p.unit)}</span>
       </div>
+      <SourceLine trace={p.trace.net_unit_cost_chf} />
       <small className="muted">Unit price incl. labour: CHF {p.quantity ? money(p.direct_position_cost_chf / p.quantity, 2) : '—'}</small>
     </label>
   )

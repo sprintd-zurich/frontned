@@ -1,7 +1,7 @@
 import type { CSSProperties } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Calculator, Check, FileText, Layers, Link2, Eye, Upload } from 'lucide-react'
-import { metrics, systemsOf, workflow } from '../derive'
+import { metrics, workflow } from '../derive'
 import { fmtDate, money } from '../format'
 import { useEstimate, useStore } from '../store'
 import { Ring } from './ui'
@@ -78,47 +78,32 @@ const STEP_HELP: Record<string, string> = {
   export: 'Offer exported since the last change',
 }
 
-/** The HVAC systems as a floating strip between the project progress and the work area; a click filters every view. */
-export function SystemStrip() {
+/** The HVAC trades (air, cooling, electro, …) in their standard colours, fixed under the project progress; a click filters every view. */
+export function CategoryStrip() {
   const e = useEstimate()
-  const { system, filter } = useStore()
-  const systems = systemsOf(e.positions)
-  const all = metrics(e.positions)
+  const { category, filter } = useStore()
   return (
-    <nav className="system-strip" aria-label="HVAC systems">
-      <button className={`system-chip all ${system === 'all' ? 'selected' : ''}`} onClick={() => filter({ system: 'all' })}>
-        <span className="chip-dot">
-          <Layers size={14} />
-        </span>
-        <span className="chip-body">
-          <strong>All systems</strong>
-          <small>
-            {systems.length} systems · {all.total} positions
-          </small>
-        </span>
-        <b>{all.percent}%</b>
+    <nav className="category-strip" aria-label="HVAC categories">
+      <button className={`category-chip all ${category === 'all' ? 'selected' : ''}`} onClick={() => filter({ category: 'all' })}>
+        <Layers size={13} /> All <span>{e.positions.length}</span>
       </button>
-      {systems.map((s) => {
-        const mm = metrics(e.positions.filter((p) => p.system === s.id))
+      {e.categories.map((c) => {
+        const n = e.positions.filter((p) => p.category === c.id).length
         return (
           <button
-            key={s.id}
-            className={`system-chip ${system === s.id ? 'selected' : ''}`}
-            style={{ '--system-color': s.color, '--value': `${mm.percent * 3.6}deg` } as CSSProperties}
-            onClick={() => filter({ system: system === s.id ? 'all' : s.id })}
-            title={`${s.id} · CHF ${money(mm.value)} direct cost`}
+            key={c.id}
+            disabled={!n}
+            className={`category-chip ${category === c.id ? 'selected' : ''}`}
+            style={{ '--cat': c.color } as CSSProperties}
+            onClick={() => filter({ category: category === c.id ? 'all' : c.id })}
+            title={n ? `${n} positions, CHF ${money(sum(e.positions.filter((p) => p.category === c.id)))} direct cost` : 'Not in this tender'}
           >
-            <span className="chip-dot" />
-            <span className="chip-body">
-              <strong>{s.name}</strong>
-              <small>
-                {s.code} · {mm.total} pos.
-              </small>
-            </span>
-            <b>{mm.percent}%</b>
+            {c.label} <span>{n}</span>
           </button>
         )
       })}
     </nav>
   )
 }
+
+const sum = (ps: { direct_position_cost_chf: number }[]) => ps.reduce((a, p) => a + p.direct_position_cost_chf, 0)
