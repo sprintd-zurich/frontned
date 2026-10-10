@@ -8,7 +8,14 @@ interface Props {
   onParams: (b: Partial<Parameters>) => void
 }
 
-const PARAM_LABELS: Record<string, string> = {
+export const PARAM_LABELS: Record<string, string> = {
+  reference_win_probability: 'Base win probability',
+  price_sensitivity_probability_points_per_1pct_price: 'Prob. lost per +1% price',
+  strategic_appetite_adjustment: 'Strategic appetite',
+  competition_adjustment: 'Competition',
+  margin_Aggressive: 'Aggressive margin %',
+  margin_Target: 'Target margin %',
+  margin_Conservative: 'Conservative margin %',
   site_efficiency: 'Site efficiency',
   school_logistics: 'School logistics',
   mounting_height_school: 'Mounting height (school)',
@@ -164,7 +171,7 @@ export function BuildUpView({ estimate, onParams }: Props) {
   )
 }
 
-function ParamGroup({
+export function ParamGroup({
   title,
   group,
   values,

@@ -30,6 +30,9 @@ export const api = {
     call<Estimate>(`/api/tenders/${id}/positions/${lvId}`, json('PATCH', body)),
   setParameters: (id: string, body: Partial<Parameters>) =>
     call<Estimate>(`/api/tenders/${id}/parameters`, json('PATCH', body)),
+  saveSnapshot: (id: string, name: string) => call<Estimate>(`/api/tenders/${id}/snapshots`, json('POST', { name })),
+  deleteSnapshot: (id: string, sid: string) => call<Estimate>(`/api/tenders/${id}/snapshots/${sid}`, { method: 'DELETE' }),
+  applySnapshot: (id: string, sid: string) => call<Estimate>(`/api/tenders/${id}/snapshots/${sid}/apply`, { method: 'POST' }),
   catalog: () => call<CatalogItem[]>('/api/reference/catalog'),
   pageUrl: (id: string, page: number) => `${BASE}/api/tenders/${id}/pages/${page}.png`,
 }

@@ -1,10 +1,12 @@
 import type { Estimate } from '../types'
 import { fmtChf } from '../format'
 
+export type Tab = 'positions' | 'buildup' | 'bid'
+
 interface Props {
   estimate: Estimate
-  tab: 'positions' | 'buildup'
-  onTab: (t: 'positions' | 'buildup') => void
+  tab: Tab
+  onTab: (t: Tab) => void
   busy: string | null
   onHome: () => void
 }
@@ -36,6 +38,9 @@ export function Header({ estimate, tab, onTab, busy, onHome }: Props) {
           </button>
           <button className={tab === 'buildup' ? 'active' : ''} onClick={() => onTab('buildup')}>
             Price build-up
+          </button>
+          <button className={tab === 'bid' ? 'active' : ''} onClick={() => onTab('bid')}>
+            Bid decision
           </button>
         </nav>
         <div className="busy">{busy && <span className="spinner small" />}</div>

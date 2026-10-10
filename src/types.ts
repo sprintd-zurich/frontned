@@ -69,6 +69,53 @@ export interface Parameters {
   commercial: Record<string, number>
   project_costs: Record<string, number>
   allowances: Record<string, number>
+  bid: Record<string, number>
+}
+
+export interface BidScenario {
+  scenario: string
+  bid_price_chf: number
+  margin_pct: number
+  estimated_win_probability: number
+  expected_contribution_chf: number
+}
+
+export interface BidPoint {
+  margin_pct: number
+  bid_price_chf: number
+  estimated_win_probability: number
+  expected_contribution_chf: number
+}
+
+export interface BidAnalysis {
+  scenarios: BidScenario[]
+  recommended: string
+  curve: BidPoint[]
+  peak_margin_pct: number
+  cost_baseline_chf: number
+  reference_price_chf: number
+  inputs: Record<string, number>
+  limits: { min_probability: number; max_probability: number }
+}
+
+export interface Snapshot {
+  id: string
+  name: string
+  overrides: number
+  parameters: Parameters
+  summary: {
+    material_cost_chf: number
+    labour_cost_chf: number
+    install_hours: number
+    direct_cost_chf: number
+    cost_baseline_chf: number
+    selling_price_rounded_chf: number
+    target_margin_pct: number
+    recommended_scenario: string
+    recommended_bid_chf: number
+    recommended_win_probability: number
+    recommended_contribution_chf: number
+  }
 }
 
 export interface Estimate {
@@ -76,6 +123,8 @@ export interface Estimate {
   positions: Position[]
   project: Project
   parameters: Parameters
+  bid: BidAnalysis
+  snapshots: Snapshot[]
 }
 
 export interface CatalogItem {
