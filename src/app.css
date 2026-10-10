@@ -2867,3 +2867,175 @@ body.resizing img {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* ---------- projects dashboard: combined status, centred steps, documents and product lists ---------- */
+.hero-status {
+  width: 270px;
+  gap: 8px;
+}
+.hero-status .section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.hero-status .section-heading .badge {
+  font-size: 10px;
+  margin: 0;
+}
+.hero-status-legend {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  margin-top: 2px;
+}
+.hero-status-legend button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  color: #476391;
+  padding: 2px 0;
+}
+.hero-status-legend button:hover {
+  color: #0560c8;
+}
+.hero-status-legend i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.hero-status-legend b {
+  font-size: 11px;
+  color: #0b2236;
+}
+.report-button {
+  margin-top: 6px;
+  justify-content: center;
+  text-decoration: none;
+}
+.report-button:not(.primary) {
+  background: #eef1f5;
+  color: #5b6b82;
+  border-color: #dfe4ec;
+}
+.project-hero .workflow.steps-only {
+  justify-content: center;
+}
+.project-hero .workflow.steps-only .workflow-steps {
+  max-width: 760px;
+  justify-content: center;
+  margin: 0 auto;
+  padding-right: 0;
+}
+.project-hero .workflow.steps-only .workflow-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+.project-hero .workflow.steps-only .step-circle {
+  width: 42px;
+  height: 42px;
+  margin-bottom: 6px;
+}
+.project-hero .workflow.steps-only .step-circle > span {
+  width: 34px;
+  height: 34px;
+}
+.project-hero .workflow.steps-only .step-circle svg {
+  width: 16px;
+  height: 16px;
+}
+.project-hero .workflow.steps-only .workflow-step:after {
+  top: 21px;
+  left: calc(50% + 30px);
+  width: calc(100% - 41px);
+}
+.project-hero .workflow.steps-only .workflow-step strong {
+  font-size: 10px;
+}
+.project-hero .workflow.steps-only .workflow-step > span {
+  font-size: 11px;
+}
+.dashboard-grid .activity {
+  overflow: auto;
+}
+.dashboard-lower {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 12px;
+  align-items: stretch;
+}
+.dashboard-lower .card {
+  padding: 16px;
+}
+.product-lists {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.product-drop {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1.5px dashed #b9c8dc;
+  border-radius: 10px;
+  padding: 14px;
+  color: #476391;
+  cursor: pointer;
+  background: #f8fafd;
+  transition: background 0.15s, border-color 0.15s;
+}
+.product-drop:hover,
+.product-drop.drag {
+  border-color: #1389ff;
+  background: #eef6ff;
+}
+.product-drop strong {
+  display: block;
+  font-size: 12px;
+  color: #0b2236;
+}
+.product-drop small {
+  display: block;
+  font-size: 10px;
+  margin-top: 3px;
+}
+.product-list-files {
+  max-height: 210px;
+  overflow: auto;
+}
+.product-list-files > a {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid #edf0f5;
+  font-size: 11px;
+  color: inherit;
+  text-decoration: none;
+}
+.product-list-files > a > span:nth-child(2) {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.product-list-files small {
+  display: block;
+  margin-top: 4px;
+  color: #6e83a2;
+  font-size: 10px;
+}
+.product-lists > .text-button {
+  align-self: flex-start;
+}
+@media (max-width: 1100px) {
+  .dashboard-lower {
+    grid-template-columns: 1fr;
+  }
+  .hero-status {
+    width: auto;
+  }
+}
