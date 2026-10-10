@@ -57,6 +57,7 @@ export const api = {
   deleteNote: (id: string, lvId: string, nid: string) =>
     call<Estimate>(`/api/tenders/${id}/positions/${lvId}/notes/${nid}`, { method: 'DELETE' }),
   source: (id: string, lvId: string) => call<SourceLocation>(`/api/tenders/${id}/positions/${lvId}/source`),
+  selectBid: (id: string, scenario: string | null) => call<Estimate>(`/api/tenders/${id}/bid/select`, json('POST', { scenario })),
   setParameters: (id: string, body: Partial<Parameters>) =>
     call<Estimate>(`/api/tenders/${id}/parameters`, json('PATCH', body)),
   saveSnapshot: (id: string, name: string) => call<Estimate>(`/api/tenders/${id}/snapshots`, json('POST', { name })),

@@ -316,6 +316,12 @@ export interface BidAnalysis {
   limits: { min_probability: number; max_probability: number }
   /** the bid suggested from the team's experience, once added from the Experience tab */
   experience: ExperienceScenario | null
+  /** the estimator's own scenario (Custom window) */
+  custom: BidScenario
+  /** average inflation over the project duration, added to the baseline the bids are calculated on */
+  inflation: { inflation_pct: number; duration_months: number; average_pct: number; amount_chf: number; bid_baseline_chf: number }
+  /** the scenario that goes into the offer and the exports, null = indicative selling price */
+  selected: string | null
 }
 
 export interface ExperienceScenario extends BidScenario {
@@ -353,6 +359,8 @@ export interface Estimate {
   project: Project
   parameters: Parameters
   bid: BidAnalysis
+  /** the price the exports carry: the selected bid, or the indicative selling price */
+  offer: { scenario: string | null; price_chf: number }
   snapshots: Snapshot[]
   checks: DesignCheck[]
   activity: Activity[]
