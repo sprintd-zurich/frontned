@@ -108,7 +108,11 @@ export function Bid() {
           <ScenarioCard key={s.scenario} s={s} best={s.scenario === view.recommended} selected={s.scenario === bid.selected} onSelect={() => choose(s.scenario)} />
         ))}
         <ScenarioCard s={view.custom} best={false} selected={bid.selected === 'Custom'} onSelect={() => choose('Custom')}>
-          <small className="muted">Your margin and market numbers from the Custom window below.</small>
+          <small className="muted">
+            {view.scenarios.find((s) => s.scenario === 'Target')?.bid_price_chf === view.custom.bid_price_chf
+              ? 'Starts at the Target margin: change the Custom margin below to set your own bid.'
+              : 'Your margin and market numbers from the Custom window below.'}
+          </small>
         </ScenarioCard>
         {view.experience && <ExperienceCard x={view.experience} selected={bid.selected === 'Experience'} onSelect={() => choose('Experience')} />}
       </div>
