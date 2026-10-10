@@ -128,6 +128,28 @@ export interface Experience {
   file: { name: string; stored: string } | null
 }
 
+export interface BidSuggestion {
+  price_chf: number
+  low_chf: number
+  high_chf: number
+  closest_scenario: string | null
+  margin_pct: number | null
+  summary: string
+  reasoning: { text: string; entries: string[]; scenarios: string[] }[]
+  entries_used: { id: string; effect_pct: number | null; how: string }[]
+  entries_ignored: string[]
+  caveats: string[]
+  model: string
+  at: string
+  /** what the model was given, to tell when the suggestion is out of date */
+  input: {
+    cost_baseline_chf: number
+    scenarios: { name: string; bid_price_chf: number; margin_pct: number; win_probability: number }[]
+    recommended_scenario: string
+    entry_ids: string[]
+  }
+}
+
 export interface SupplierItem {
   lv_id: string
   package: string
@@ -302,6 +324,8 @@ export interface Estimate {
   activity: Activity[]
   sheets: Sheet[]
   experience: Experience[]
+  bid_suggestion: BidSuggestion | null
+  suggestion_service: { configured: boolean; model: string }
 }
 
 export interface CatalogItem {

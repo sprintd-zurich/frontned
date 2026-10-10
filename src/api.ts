@@ -100,5 +100,6 @@ export const api = {
     return call<Estimate>(`/api/tenders/${id}/experience`, { method: 'POST', body: form })
   },
   deleteExperience: (id: string, eid: string) => call<Estimate>(`/api/tenders/${id}/experience/${eid}`, { method: 'DELETE' }),
+  suggestBid: (id: string) => call<Estimate>(`/api/tenders/${id}/experience/suggest`, { method: 'POST' }),
   experienceFileUrl: (id: string, eid: string) => `${BASE}/api/tenders/${id}/experience/${eid}/file`,
 }

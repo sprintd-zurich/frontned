@@ -1,10 +1,10 @@
 import { useRef, useState } from 'react'
-import { Lightbulb, MessageSquareQuote, Paperclip, Percent, Sparkles, Trash2, TrendingUp } from 'lucide-react'
+import { AlertTriangle, Bot, Lightbulb, MessageSquareQuote, Paperclip, Percent, Sparkles, Trash2, TrendingUp } from 'lucide-react'
 import { api } from '../api'
 import { initials, systemsOf } from '../derive'
-import { fmtWhen } from '../format'
+import { fmtChf, fmtWhen } from '../format'
 import { useEstimate, useStore } from '../store'
-import type { Experience as Entry } from '../types'
+import type { BidSuggestion, Estimate, Experience as Entry } from '../types'
 import { Button, Empty } from '../components/ui'
 
 const KINDS = [
@@ -30,6 +30,7 @@ export function Experience() {
   const entries = [...e.experience].reverse().filter((x) => kind === 'all' || x.kind === kind)
   const estimates = e.experience.filter((x) => x.adjustment_pct != null)
   const net = estimates.reduce((s, x) => s + (x.adjustment_pct ?? 0), 0)
+  const usedIds = new Set(e.bid_suggestion?.entries_used.map((u) => u.id) ?? [])
   return (
     <div className="experience-page">
       <section className="card experience-intro">
@@ -45,8 +46,8 @@ export function Experience() {
         <div className="experience-future">
           <Sparkles size={16} />
           <span>
-            <strong>Planned</strong>
-            <small>These entries will feed adjustments to the bid scenarios based on history and experience.</small>
+            <strong>Bid suggestion</strong>
+            <small>Apertus, the Swiss open language model, can read these entries with the bid scenarios and suggest a bid price below.</small>
           </span>
         </div>
       </section>
@@ -64,7 +65,7 @@ export function Experience() {
             </div>
           </div>
           {entries.length ? (
-            entries.map((x) => <EntryRow key={x.id} x={x} />)
+            entries.map((x) => <EntryRow key={x.id} x={x} used={usedIds.has(x.id)} />)
           ) : (
             <Empty icon={<Lightbulb size={28} />} title="No experience recorded yet">
               Add what you would tell a colleague pricing this tender for the first time.
@@ -102,6 +103,215 @@ export function Experience() {
           )}
         </section>
       </div>
+      <SuggestionPanel />
+    </div>
+  )
+}
+
+/** Jump to an entry in the list and flash it, so each point of the suggestion can be checked against its source. */
+function showEntry(id: string) {
+  const el = document.getElementById(`exp-${id}`)
+  if (!el) return
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  el.classList.remove('flash')
+  void el.offsetWidth
+  el.classList.add('flash')
+}
+
+/** Out of date when the entries or the scenario prices changed since Apertus was asked. */
+function staleness(e: Estimate, s: BidSuggestion) {
+  const now = e.experience.map((x) => x.id)
+  const added = now.filter((id) => !s.input.entry_ids.includes(id)).length
+  const removed = s.input.entry_ids.filter((id) => !now.includes(id)).length
+  const moved = e.bid.scenarios.some(
+    (c) => s.input.scenarios.find((x) => x.name === c.scenario)?.bid_price_chf !== c.bid_price_chf,
+  )
+  const why = [
+    added && `${added} entr${added > 1 ? 'ies' : 'y'} added`,
+    removed && `${removed} entr${removed > 1 ? 'ies' : 'y'} removed`,
+    moved && 'the bid scenarios changed',
+  ].filter(Boolean)
+  return why.length ? `Out of date: ${why.join(', ')} since this suggestion. Ask again to include it.` : null
+}
+
+function SuggestionPanel() {
+  const e = useEstimate()
+  const act = useStore((st) => st.act)
+  const busy = useStore((st) => st.busy)
+  const s = e.bid_suggestion
+  const svc = e.suggestion_service
+  const asking = busy === 'Asking Apertus…'
+  const ask = () => act('Asking Apertus…', (tid) => api.suggestBid(tid), 'Apertus suggested a bid price.')
+  const entry = (id: string) => e.experience.find((x) => x.id === id)
+  const label = (id: string) => {
+    const x = entry(id)
+    return x ? x.text || x.file?.name || id : `${id} (removed)`
+  }
+  const stale = s ? staleness(e, s) : null
+  return (
+    <section className="card suggestion">
+      <div className="suggestion-head">
+        <div>
+          <span className="ai-badge">
+            <Bot size={13} /> AI suggestion
+          </span>
+          <h2>Bid price suggestion</h2>
+          <p className="muted">
+            Apertus reads the experience entries above and the bid scenarios, then suggests a price with its reasons. It never
+            changes a price: you decide on the Bid tab.
+          </p>
+        </div>
+        <div className="suggestion-ask">
+          <Button
+            primary
+            disabled={!e.experience.length || !svc?.configured || !!busy}
+            title={
+              !svc?.configured
+                ? 'Set APERTUS_API_KEY in backend/.env and restart the backend'
+                : !e.experience.length
+                  ? 'Add an experience entry first'
+                  : undefined
+            }
+            onClick={ask}
+          >
+            <Sparkles size={14} /> {asking ? 'Asking Apertus…' : s ? 'Ask again' : 'Suggest a bid price'}
+          </Button>
+          <small>{svc?.model ?? 'Apertus'}</small>
+        </div>
+      </div>
+      {!svc?.configured && (
+        <p className="suggestion-note">
+          <AlertTriangle size={14} /> The backend has no Apertus key. Copy <code>backend/.env.example</code> to{' '}
+          <code>backend/.env</code>, fill in <code>APERTUS_API_KEY</code> and restart uvicorn.
+        </p>
+      )}
+      {s ? (
+        <>
+          {stale && (
+            <p className="suggestion-note">
+              <AlertTriangle size={14} /> {stale}
+            </p>
+          )}
+          <div className="suggestion-body">
+            <div className="suggestion-price">
+              <small>Suggested bid</small>
+              <strong>{fmtChf(s.price_chf)}</strong>
+              <span>
+                Range {fmtChf(s.low_chf)} – {fmtChf(s.high_chf)}
+              </span>
+              {s.margin_pct != null && <span>Margin {s.margin_pct}% on the cost baseline {fmtChf(s.input.cost_baseline_chf)}</span>}
+              {s.closest_scenario && <span>Closest scenario: {s.closest_scenario}</span>}
+              <RangeBar s={s} />
+            </div>
+            <div className="suggestion-why">
+              {s.summary && <p className="suggestion-summary">{s.summary}</p>}
+              <h3>Reasoning</h3>
+              <ol>
+                {s.reasoning.map((r, i) => (
+                  <li key={i}>
+                    {r.text}
+                    {(r.entries.length > 0 || r.scenarios.length > 0) && (
+                      <span className="cite-row">
+                        {r.entries.map((id) => (
+                          <button key={id} className="cite entry" onClick={() => showEntry(id)} title="Show this entry">
+                            {label(id)}
+                          </button>
+                        ))}
+                        {r.scenarios.map((n) => (
+                          <span key={n} className="cite scenario" title="Bid scenario from company data">
+                            {n} {fmtChf(s.input.scenarios.find((x) => x.name === n)?.bid_price_chf)}
+                          </span>
+                        ))}
+                      </span>
+                    )}
+                    {!r.entries.length && !r.scenarios.length && <span className="cite none">No source cited</span>}
+                  </li>
+                ))}
+              </ol>
+              {s.caveats.length > 0 && (
+                <>
+                  <h3>Caveats</h3>
+                  <ul>
+                    {s.caveats.map((c, i) => (
+                      <li key={i}>{c}</li>
+                    ))}
+                  </ul>
+                </>
+              )}
+            </div>
+            <div className="suggestion-sources">
+              <h3>
+                Entries used ({s.entries_used.length} of {s.input.entry_ids.length})
+              </h3>
+              {s.entries_used.map((u) => (
+                <button key={u.id} className="source-entry" onClick={() => showEntry(u.id)}>
+                  <span>{label(u.id)}</span>
+                  {u.how && <small>{u.how}</small>}
+                  {u.effect_pct != null && (
+                    <b className={u.effect_pct >= 0 ? 'up' : 'down'}>
+                      {u.effect_pct > 0 ? '+' : ''}
+                      {u.effect_pct}%
+                    </b>
+                  )}
+                </button>
+              ))}
+              {s.entries_ignored.length > 0 && (
+                <>
+                  <h3>Not used</h3>
+                  {s.entries_ignored.map((id) => (
+                    <button key={id} className="source-entry ignored" onClick={() => showEntry(id)}>
+                      <span>{label(id)}</span>
+                    </button>
+                  ))}
+                </>
+              )}
+            </div>
+          </div>
+          <small className="muted suggestion-foot">
+            Written by {s.model} · {fmtWhen(s.at)} · AI suggestion, check it before you use it. Prices in the tender are unchanged.
+          </small>
+        </>
+      ) : (
+        svc?.configured && (
+          <p className="muted">
+            {e.experience.length ? 'No suggestion yet.' : 'Add at least one experience entry, then ask for a suggestion.'}
+          </p>
+        )
+      )}
+    </section>
+  )
+}
+
+/** The suggested range against the calculated scenarios, on one scale. */
+function RangeBar({ s }: { s: BidSuggestion }) {
+  const [hover, setHover] = useState<string | null>(null)
+  const prices = [s.low_chf, s.high_chf, s.price_chf, ...s.input.scenarios.map((x) => x.bid_price_chf)]
+  const lo = Math.min(...prices) * 0.99
+  const hi = Math.max(...prices) * 1.01
+  const at = (v: number) => `${((v - lo) / (hi - lo)) * 100}%`
+  return (
+    <div className="range-bar" aria-label="Suggested range against the bid scenarios">
+      <div className="range-track">
+        <i className="range-band" style={{ left: at(s.low_chf), width: `calc(${at(s.high_chf)} - ${at(s.low_chf)})` }} />
+        {s.input.scenarios.map((x) => (
+          <i
+            key={x.name}
+            className="range-tick"
+            style={{ left: at(x.bid_price_chf) }}
+            onMouseEnter={() => setHover(x.name)}
+            onMouseLeave={() => setHover(null)}
+            title={`${x.name} ${fmtChf(x.bid_price_chf)}`}
+          />
+        ))}
+        <i className="range-dot" style={{ left: at(s.price_chf) }} title={`Suggested ${fmtChf(s.price_chf)}`} />
+      </div>
+      <div className="range-labels">
+        {s.input.scenarios.map((x) => (
+          <span key={x.name} className={hover === x.name ? 'on' : ''} style={{ left: at(x.bid_price_chf) }}>
+            {x.name}
+          </span>
+        ))}
+      </div>
     </div>
   )
 }
@@ -111,12 +321,12 @@ function scopeLabel(x: Entry) {
   return x.scope === 'project' ? s : `${s} ${x.ref}`
 }
 
-function EntryRow({ x }: { x: Entry }) {
+function EntryRow({ x, used }: { x: Entry; used: boolean }) {
   const e = useEstimate()
   const act = useStore((s) => s.act)
   const Icon = KINDS.find(([k]) => k === x.kind)?.[2] ?? MessageSquareQuote
   return (
-    <div className="experience-entry">
+    <div className="experience-entry" id={`exp-${x.id}`}>
       <span className="avatar tiny">{initials(x.author)}</span>
       <div>
         <div className="experience-meta">
@@ -127,6 +337,11 @@ function EntryRow({ x }: { x: Entry }) {
             {scopeLabel(x)} · {x.author ? `${x.author} · ` : ''}
             {fmtWhen(x.at)}
           </small>
+          {used && (
+            <span className="used-tag" title="Used by the latest bid suggestion">
+              <Bot size={11} /> used
+            </span>
+          )}
         </div>
         {x.text && <p>{x.text}</p>}
         {x.adjustment_pct != null && (
