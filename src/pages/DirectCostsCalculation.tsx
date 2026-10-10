@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
+  AlertTriangle,
   ArrowRight,
   Calculator,
   Check,
@@ -14,7 +15,7 @@ import {
 } from 'lucide-react'
 import { fmtChf, fmtNum, unit } from '../format'
 import { useEstimate, useStore } from '../store'
-import { isBenchmark } from '../derive'
+import { isBenchmark, isPriceable, metrics, needsHuman } from '../derive'
 import type { PositionOverride } from '../types'
 import { Button, StatusBadge } from '../components/ui'
 import { SourceView } from '../components/SourceView'
@@ -69,6 +70,7 @@ function DirectCostsContent() {
   const [activeTab, setActiveTab] = useState<'positions' | 'buildup'>('positions')
   const [search, setSearch] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
+  const [attentionOnly, setAttentionOnly] = useState(false)
   const [showUnitCost, setShowUnitCost] = useState(false)
   const [inspectorView, setInspectorView] = useState<'formula' | 'pdf'>('formula')
 
@@ -276,9 +278,11 @@ function DirectCostsContent() {
           .toLowerCase()
           .includes(q)
       const matchesCategory = selectedCategory === 'all' || p.category === selectedCategory
-      return matchesSearch && matchesCategory
+      const matchesAttention = !attentionOnly || (isPriceable(p) && needsHuman(p))
+      return matchesSearch && matchesCategory && matchesAttention
     })
-  }, [e.positions, search, selectedCategory])
+  }, [e.positions, search, selectedCategory, attentionOnly])
+  const attentionCount = useMemo(() => metrics(e.positions).attention, [e.positions])
 
   // Project Parameters
   const wastePct = e.parameters.allowances.material_waste_pct ?? 5
@@ -361,6 +365,15 @@ function DirectCostsContent() {
                   </button>
                 )}
               </label>
+
+              <button
+                className={`attention-filter ${attentionOnly ? 'active' : ''}`}
+                aria-pressed={attentionOnly}
+                onClick={() => setAttentionOnly((v) => !v)}
+                title="Only positions waiting on a decision, missing information or a supplier price"
+              >
+                <AlertTriangle size={14} /> Needs attention ({attentionCount})
+              </button>
 
               <div className="unit-total-toggle">
                 <button

@@ -17,7 +17,7 @@ import {
 } from 'lucide-react'
 import { fmtNum, money, unit } from '../format'
 import { useEstimate, useStore } from '../store'
-import { isBenchmark, isPriceable, metrics } from '../derive'
+import { isBenchmark, isPriceable, metrics, needsHuman } from '../derive'
 import type { CatalogItem, Position, Status } from '../types'
 import { Button, StatusBadge } from '../components/ui'
 import { SourceView } from '../components/SourceView'
@@ -36,7 +36,7 @@ const CATEGORY_COLORS: Record<string, { bg: string; text: string; border: string
   'Controls': { bg: '#fae8ff', text: '#a21caf', border: '#f5d0fe' },
 }
 
-type RouteFilter = 'all' | 'calculated' | 'quote' | 'assumption' | 'approved' | 'review'
+type RouteFilter = 'all' | 'attention' | 'calculated' | 'quote' | 'assumption' | 'approved' | 'review'
 
 export function MatchedItems() {
   const estimate = useStore((s) => s.estimate)
@@ -66,7 +66,15 @@ function MatchedItemsContent() {
 
   const [search, setSearch] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
-  const [routeFilter, setRouteFilter] = useState<RouteFilter>('all')
+  // "Needs attention" from the dashboard or Export opens this tab already filtered
+  const [routeFilter, setRouteFilter] = useState<RouteFilter>(() => {
+    const f = useStore.getState()
+    return f.pill === 'decision' || f.only?.label === 'Needs attention' ? 'attention' : 'all'
+  })
+  useEffect(() => {
+    const f = useStore.getState()
+    if (f.pill === 'decision' || f.only) f.filter({ pill: 'all', only: null })
+  }, [])
   const [inspectorTab, setInspectorTab] = useState<'matching' | 'source'>('matching')
 
   // Cost editing in Matched Items
@@ -185,6 +193,7 @@ function MatchedItemsContent() {
       if (routeFilter === 'calculated') matchesRoute = p.status === 'calculated'
       else if (routeFilter === 'quote') matchesRoute = p.status === 'supplier_quote_required'
       else if (routeFilter === 'assumption') matchesRoute = p.status === 'assumption_applied'
+      else if (routeFilter === 'attention') matchesRoute = isPriceable(p) && needsHuman(p)
       else if (routeFilter === 'approved') matchesRoute = p.reviewed
       else if (routeFilter === 'review') matchesRoute = isPriceable(p) && !p.reviewed
 
@@ -224,7 +233,7 @@ function MatchedItemsContent() {
     const requested = e.positions.filter((p) => p.status === 'supplier_quote_required' && p.requested).length
     const assumptions = e.positions.filter((p) => p.status === 'assumption_applied').length
     const m = metrics(e.positions)
-    return { directCatalogue, quotes, requested, assumptions, approved: m.approved, open: m.open }
+    return { directCatalogue, quotes, requested, assumptions, approved: m.approved, open: m.open, attention: m.attention }
   }, [e.positions])
 
   // Alternatives in the same category
@@ -238,6 +247,7 @@ function MatchedItemsContent() {
 
   const routeOptions: [RouteFilter, string][] = [
     ['all', `All (${e.positions.length})`],
+    ['attention', `Needs attention (${stats.attention})`],
     ['calculated', `Dataset priced (${stats.directCatalogue})`],
     ['quote', `Supplier Quote Required (${stats.quotes}${stats.requested ? ` · ${stats.requested} requested` : ''})`],
     ['assumption', `Assumption Applied (${stats.assumptions})`],
