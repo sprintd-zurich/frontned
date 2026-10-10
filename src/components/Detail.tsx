@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import {
   AlertTriangle,
-  ArrowRight,
   Check,
   CheckCircle2,
   ChevronLeft,
@@ -33,16 +32,13 @@ export function Detail({ p, mode, rows }: { p: Position; mode: Mode; rows: Posit
   const { override, select, addNote, deleteNote, checksFor } = useDetailActions()
   const busy = useStore((s) => s.busy)
   const rules = useStore((s) => s.rules)
-  const tabs =
-    mode === 'calculation'
-      ? ['Calculation', 'Alternatives', 'History']
-      : ['AI Proposal', 'Source', 'Discussion', 'Alternatives', 'Technical', 'History']
+  const tabs = ['AI Proposal', 'Source', 'Discussion', 'Alternatives', 'Technical', 'History']
   const [tab, setTab] = useState(tabs[0])
   const [note, setNote] = useState('')
   const [modal, setModal] = useState<'' | 'products' | 'rule'>('')
   const compact = mode === 'positions'
   useEffect(() => {
-    setTab(mode === 'calculation' ? 'Calculation' : 'AI Proposal')
+    setTab('AI Proposal')
     setNote('')
   }, [mode, p.lv_id])
 
@@ -199,63 +195,26 @@ export function Detail({ p, mode, rows }: { p: Position; mode: Mode; rows: Posit
         </>
       ) : (
         <>
-          {mode !== 'calculation' && (
-            <div className="description-block">
-              <div>
-                <h4>Description</h4>
-                <p>
-                  <b>{p.title}</b>
-                  {p.variant && ` · ${p.variant}`}
-                </p>
-                {p.description && p.description !== p.title && <p className="clamp">{p.description}</p>}
-              </div>
-              <Ring value={Math.round(p.match_confidence * 100)} size={compact ? 82 : 88} label="Match confidence" />
+          <div className="description-block">
+            <div>
+              <h4>Description</h4>
+              <p>
+                <b>{p.title}</b>
+                {p.variant && ` · ${p.variant}`}
+              </p>
+              {p.description && p.description !== p.title && <p className="clamp">{p.description}</p>}
             </div>
-          )}
-          {mode === 'calculation' && (
-            <button className="product-selector large" onClick={() => setModal('products')}>
-              <ProductGraphic fire={isFire(p)} />
-              <span>
-                <strong>{p.product_id ?? 'No catalogue item'}</strong>
-                <span>{p.product_description ?? p.title}</span>
-                <small>{p.price_source?.replace(/_/g, ' ')}</small>
-                <span className="text-link">
-                  Change product <ArrowRight size={14} />
-                </span>
-              </span>
-            </button>
-          )}
+            <Ring value={Math.round(p.match_confidence * 100)} size={compact ? 82 : 88} label="Match confidence" />
+          </div>
           <div className="quantity-product">
             {quantity}
             <div>
-              {mode === 'calculation' ? (
-                <UnitCost p={p} onSave={(v) => set({ net_unit_cost_chf: v }, `${p.lv_id}: unit cost set to CHF ${money(v, 2)}.`)} />
-              ) : (
-                <>
-                  <h4>Selected product</h4>
-                  {product}
-                </>
-              )}
+              <h4>Selected product</h4>
+              {product}
             </div>
           </div>
           {rule}
-          {mode === 'calculation' ? (
-            <>
-              <div className="calc-embedded">
-                <CostPanel p={p} heading={false} />
-              </div>
-              <div className="confidence-card">
-                <Ring value={Math.round(p.match_confidence * 100)} size={80} label="Match" />
-                <div>
-                  <h3>{p.match_confidence >= 0.85 ? 'High confidence' : p.match_confidence >= 0.6 ? 'Check the match' : 'Low confidence'}</h3>
-                  <p>{p.assumptions[0] ?? 'Exact catalogue item and installation rule for this description.'}</p>
-                  <button className="text-button" onClick={() => setTab('Alternatives')}>
-                    View alternatives <ArrowRight size={14} />
-                  </button>
-                </div>
-              </div>
-            </>
-          ) : !compact ? (
+          {!compact && (
             <div className="technical-grid">
               <section>
                 <h4>AI extracted values</h4>
@@ -273,7 +232,7 @@ export function Detail({ p, mode, rows }: { p: Position; mode: Mode; rows: Posit
                 <ProductFacts id={p.product_id} />
               </section>
             </div>
-          ) : null}
+          )}
           {checks.length > 0 && (
             <div className={`validation ${checks.some((c) => c.level === 'warning') ? '' : 'calm'}`}>
               <h4>
@@ -287,20 +246,25 @@ export function Detail({ p, mode, rows }: { p: Position; mode: Mode; rows: Posit
               ))}
             </div>
           )}
-          {mode !== 'calculation' && (
-            <label className="status-select">
-              <h4>Status</h4>
-              <select
-                value={p.status}
-                onChange={(ev) => set({ status: ev.target.value as Status }, `${p.lv_id}: status set to ${STATUS_META[ev.target.value as Status].label}.`)}
-              >
-                {STATUS_ORDER.map((s) => (
-                  <option key={s} value={s}>
-                    {STATUS_META[s].label}
-                  </option>
-                ))}
-              </select>
-            </label>
+          <label className="status-select">
+            <h4>Status</h4>
+            <select
+              value={p.status}
+              onChange={(ev) => set({ status: ev.target.value as Status }, `${p.lv_id}: status set to ${STATUS_META[ev.target.value as Status].label}.`)}
+            >
+              {STATUS_ORDER.map((s) => (
+                <option key={s} value={s}>
+                  {STATUS_META[s].label}
+                </option>
+              ))}
+            </select>
+          </label>
+          {!compact && (
+            <div className="calc-embedded">
+              <h3 className="calc-title">Calculation</h3>
+              <UnitCost p={p} onSave={(v) => set({ net_unit_cost_chf: v }, `${p.lv_id}: unit cost set to CHF ${money(v, 2)}.`)} />
+              <CostPanel p={p} heading={false} />
+            </div>
           )}
         </>
       )}
@@ -642,7 +606,7 @@ function RuleModal({
         </label>
       </div>
       <div className="notice subtle">
-        <ShieldCheck size={16} /> Factors are project parameters; change them for all positions under Calculation → Project build-up.
+        <ShieldCheck size={16} /> Factors are project parameters; change them for all positions under Review → Project build-up.
       </div>
       <div className="modal-actions">
         <Button onClick={close}>Cancel</Button>

@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
-import { NavLink, useLocation, useNavigate } from 'react-router-dom'
+import { Navigate, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { AlertTriangle, ArrowRight, CheckCircle2, HelpCircle, Search, X } from 'lucide-react'
 import { initials } from './derive'
 import { useStore } from './store'
 import { Button, Modal } from './components/ui'
-import { ProjectCard, SystemSidebar, Workflow } from './components/Shell'
+import { ProjectCard, SystemStrip, Workflow } from './components/Shell'
 import { Overview, ProjectsSidebar } from './pages/Overview'
 import { Workspace } from './pages/Workspace'
 import { FaceToFace } from './pages/FaceToFace'
@@ -18,7 +18,6 @@ const NAV = [
   ['/positions', 'Positions'],
   ['/review', 'Review'],
   ['/systems', 'Systems'],
-  ['/calculation', 'Calculation'],
   ['/bid', 'Bid'],
   ['/export', 'Export'],
 ] as const
@@ -55,7 +54,7 @@ export default function App() {
               key={url}
               to={url}
               end={url === '/'}
-              className={({ isActive }) => (isActive || (page === '/face-to-face' && url === '/positions') ? 'active' : '')}
+              className={({ isActive }) => (isActive ? 'active' : '')}
             >
               {label}
             </NavLink>
@@ -90,7 +89,7 @@ export default function App() {
           </button>
         </div>
       )}
-      <div className={`app ${overview ? 'dashboard-shell' : ''}`}>
+      <div className={`app ${overview ? 'dashboard-shell' : 'workspace-shell'}`}>
         {overview ? (
           <ProjectsSidebar />
         ) : (
@@ -99,7 +98,7 @@ export default function App() {
               <ProjectCard />
               <Workflow />
             </div>
-            <SystemSidebar />
+            <SystemStrip />
           </>
         )}
         <main className={overview ? 'dashboard-main' : 'workspace-main'}>
@@ -111,10 +110,12 @@ export default function App() {
             <Bid />
           ) : page === '/export' ? (
             <Export />
-          ) : page === '/face-to-face' ? (
-            <FaceToFace />
+          ) : page === '/review' ? (
+            <Workspace />
+          ) : page === '/calculation' ? (
+            <Navigate to="/review" replace />
           ) : (
-            <Workspace mode={page === '/review' ? 'review' : page === '/calculation' ? 'calculation' : 'positions'} />
+            <FaceToFace />
           )}
         </main>
       </div>
@@ -138,12 +139,10 @@ export default function App() {
         <Modal title="From tender to a first price you can defend" close={() => setModal('')}>
           <p>Import the tender PDF. Every step below works on the real extraction and prices.</p>
           <ol className="guide">
-            <li>Positions: every LV line with quantity, matched product, installation rule and price.</li>
-            <li>Face 2 face: the tender page next to the extracted positions, with the source line highlighted.</li>
-            <li>Review: decide the open positions, switch products, request quotes and approve.</li>
-            <li>Calculation: the cost of every position and the build-up to the selling price.</li>
+            <li>Positions: every extracted LV line next to the tender page, with its source highlighted.</li>
+            <li>Review: decide the open positions, switch products, request quotes and approve; the calculation of each position and the project build-up live here too.</li>
             <li>Bid: compare margins, win probability and saved scenarios.</li>
-            <li>Export: the priced tender PDF, the offer workbook and supplier RFQs.</li>
+            <li>Export: the positions next to the priced tender PDF, the offer workbook and supplier RFQs.</li>
           </ol>
           <Button
             primary

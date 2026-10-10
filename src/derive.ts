@@ -85,9 +85,9 @@ export function workflow(e: Estimate) {
   const lastChange = lastOf(e.activity, ['change', 'review', 'scenario'])
   const exported = !!lastExport && (!lastChange || lastExport.at >= lastChange.at)
   return [
-    { key: 'extract', label: 'Extract', value: share((p) => p.quantity != null), url: '/face-to-face' },
+    { key: 'extract', label: 'Extract', value: share((p) => p.quantity != null), url: '/positions' },
     { key: 'match', label: 'Match', value: share((p) => p.match_kind !== 'unknown'), url: '/positions' },
-    { key: 'calculate', label: 'Calculate', value: share((p) => p.direct_position_cost_chf > 0), url: '/calculation' },
+    { key: 'calculate', label: 'Calculate', value: share((p) => p.direct_position_cost_chf > 0), url: '/review' },
     { key: 'review', label: 'Review', value: share((p) => !needsDecision(p)), url: '/review' },
     { key: 'approve', label: 'Approve', value: share((p) => p.reviewed), url: '/review' },
     { key: 'export', label: 'Export', value: exported ? 100 : 0, url: '/export' },

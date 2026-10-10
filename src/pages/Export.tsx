@@ -8,6 +8,7 @@ import { useEstimate, useStore } from '../store'
 import type { RfqPackage } from '../types'
 import { PreviewModal, type PreviewKind } from '../components/PreviewModal'
 import { Button, Ring, StatusBadge } from '../components/ui'
+import { FaceToFace } from './FaceToFace'
 
 export function Export() {
   const e = useEstimate()
@@ -49,6 +50,7 @@ export function Export() {
           </Button>
         </div>
       </section>
+      <FaceToFace priced />
       <div className="export-grid">
         <section className="card">
           <h2>Submission checklist</h2>

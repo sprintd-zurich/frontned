@@ -85,7 +85,7 @@ export function Systems() {
       </div>
       <div className="notice subtle">
         <Layers size={19} /> Project costs (engineering, commissioning, hygiene, documentation, transport) are not split by
-        system; see Calculation → Project build-up.
+        system; see Review → Project build-up.
       </div>
     </section>
   )
