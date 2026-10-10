@@ -134,6 +134,36 @@ export function PositionDrawer({ position: p, tenderId, catalog, onClose, onOver
           )}
         </section>
 
+        {p.alternatives.length > 0 && (
+          <section className="card">
+            <div className="card-title">Alternatives</div>
+            <table className="alt-table">
+              <tbody>
+                {p.alternatives.map((a) => (
+                  <tr key={a.product_id}>
+                    <td>
+                      <span className="pid">{a.product_id}</span> {a.description}
+                      <div className="muted small">{a.reason}</div>
+                    </td>
+                    <td className="num">
+                      {fmtChf(a.net_unit_cost_chf, true)}
+                      <div className={`small ${a.material_delta_chf > 0 ? 'muted' : 'ok-text'}`}>
+                        {a.material_delta_chf > 0 ? '+' : '−'}
+                        {fmtChf(Math.abs(a.material_delta_chf))} material
+                      </div>
+                    </td>
+                    <td className="num">
+                      <button className="btn small-btn" onClick={() => onOverride({ product_id: a.product_id })}>
+                        Use
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
+        )}
+
         <section className="card">
           <div className="card-title">Adjust</div>
           <div className="form">

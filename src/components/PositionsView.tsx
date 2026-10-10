@@ -7,6 +7,8 @@ interface Props {
   estimate: Estimate
   catalog: CatalogItem[]
   onOverride: (lvId: string, body: PositionOverride) => void
+  only?: { label: string; ids: string[] } | null
+  onClearOnly?: () => void
 }
 
 type Focus = 'all' | 'attention' | 'priced'
@@ -29,7 +31,7 @@ export function Confidence({ value }: { value: number }) {
   )
 }
 
-export function PositionsView({ estimate, catalog, onOverride }: Props) {
+export function PositionsView({ estimate, catalog, onOverride, only, onClearOnly }: Props) {
   const [system, setSystem] = useState<string>('all')
   const [statuses, setStatuses] = useState<Set<Status>>(new Set())
   const [focus, setFocus] = useState<Focus>('all')
@@ -47,6 +49,7 @@ export function PositionsView({ estimate, catalog, onOverride }: Props) {
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase()
     return estimate.positions.filter((p) => {
+      if (only && !only.ids.includes(p.lv_id)) return false
       if (system !== 'all' && p.system !== system) return false
       if (statuses.size && !statuses.has(p.status)) return false
       if (hideDucts && p.kind !== 'quantity' && p.kind !== 'equipment_unit' && p.kind !== 'lump_sum') return false
@@ -57,7 +60,7 @@ export function PositionsView({ estimate, catalog, onOverride }: Props) {
         return false
       return true
     })
-  }, [estimate, system, statuses, focus, query, hideDucts])
+  }, [estimate, system, statuses, focus, query, hideDucts, only])
 
   const groups = useMemo(() => {
     const g = new Map<string, Position[]>()
@@ -129,6 +132,11 @@ export function PositionsView({ estimate, catalog, onOverride }: Props) {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
+          {only && (
+            <button className="chip info only-chip" onClick={onClearOnly} title="Show all positions">
+              {only.label} ✕
+            </button>
+          )}
           <div className="muted">
             {rows.length} positions · <strong>{fmtChf(total)}</strong> direct cost
           </div>
@@ -176,7 +184,8 @@ export function PositionsView({ estimate, catalog, onOverride }: Props) {
 
       {current && (
         <PositionDrawer
-          key={current.lv_id}
+          // remount when the position changes so the edit form shows the new values
+          key={`${current.lv_id}|${current.product_id}|${current.quantity}|${current.net_unit_cost_chf}|${current.overridden.join()}`}
           position={current}
           tenderId={estimate.tender.id}
           catalog={catalog}

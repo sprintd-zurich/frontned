@@ -42,6 +42,25 @@ export interface Position {
   base_hours_per_unit: number | null
   overridden: string[]
   reviewed: boolean
+  alternatives: Alternative[]
+}
+
+export interface Alternative {
+  product_id: string
+  description: string
+  net_unit_cost_chf: number
+  install_code: string
+  reason: string
+  material_delta_chf: number
+  supplier_quote_required: boolean
+}
+
+export interface DesignCheck {
+  level: 'warning' | 'info' | 'ok'
+  title: string
+  detail: string
+  positions: string[]
+  pages: number[]
 }
 
 export interface CostLine {
@@ -125,6 +144,7 @@ export interface Estimate {
   parameters: Parameters
   bid: BidAnalysis
   snapshots: Snapshot[]
+  checks: DesignCheck[]
 }
 
 export interface CatalogItem {
