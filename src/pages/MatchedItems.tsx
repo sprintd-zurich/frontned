@@ -62,7 +62,7 @@ export function MatchedItems() {
 
 function MatchedItemsContent() {
   const e = useEstimate()
-  const { selected, select, override, notify, catalog, rules, addNote, datasets, setDataset, busy } = useStore()
+  const { selected, select, override, notify, catalog, rules, addNote } = useStore()
 
   const [search, setSearch] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
@@ -257,25 +257,6 @@ function MatchedItemsContent() {
         <span className="product-list-action">
           <AddProductList />
         </span>
-        <label className="active-dataset-control">
-          <Database size={17} />
-          <span>
-            <small>Active dataset</small>
-            <strong>{e.dataset.name} · v{e.dataset.version}</strong>
-          </span>
-          <select
-            aria-label="Change active dataset"
-            value={e.dataset.id}
-            disabled={!!busy}
-            onChange={(event) => setDataset(event.target.value)}
-          >
-            {datasets.map((dataset) => (
-              <option key={dataset.id} value={dataset.id}>
-                {dataset.name} · {[dataset.country, dataset.location || dataset.region_label].filter(Boolean).join(' · ')} · v{dataset.latest_version}
-              </option>
-            ))}
-          </select>
-        </label>
       </div>
 
       {/* Main Split Layout */}
