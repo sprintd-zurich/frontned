@@ -1584,7 +1584,7 @@ tr.approved-row td:nth-child(2) {
     max-height: none;
   }
   .workspace-main.split > .workspace.review {
-    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
     align-items: stretch;
   }
   .workspace-main.split > .workspace.review > .positions-list,
@@ -3178,4 +3178,114 @@ body.resizing img {
 .card > .category-strip {
   flex-wrap: wrap;
   overflow: visible;
+}
+
+/* ---------- review detail: grouped under headings, pop-ups for product, rule and technical data ---------- */
+.detail-group {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: #476391;
+  margin: 18px 0 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #edf0f5;
+}
+.detail-panel .description-block + .quantity-product {
+  margin-top: 10px;
+}
+.detail-panel > .detail-group:first-of-type {
+  margin-top: 10px;
+}
+.match-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 12px 0;
+}
+.match-row > div > .text-button {
+  margin-top: 6px;
+  font-size: 11px;
+}
+.match-row .installation-rule svg {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+}
+.technical-selector svg:first-child {
+  color: #0560c8;
+  flex-shrink: 0;
+  margin: 6px 4px;
+}
+.quantity-input.locked {
+  background: #f4f6f9;
+}
+.quantity-input.locked input {
+  cursor: default;
+}
+.quantity-input.missing {
+  border-color: #ff7929;
+  box-shadow: 0 0 0 2px #ff792922;
+}
+.technical-compare {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+.technical-compare dl > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid #f0f2f6;
+  font-size: 12px;
+}
+.technical-compare dt {
+  color: #6e83a2;
+}
+.technical-compare dd {
+  text-align: right;
+  font-weight: 600;
+}
+.current-product {
+  background: #f4f8fc;
+  border-radius: 8px;
+  padding: 6px 12px;
+  margin: 8px 0;
+}
+.current-product dl {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  font-size: 11px;
+}
+.current-product dl > div {
+  display: flex;
+  gap: 5px;
+}
+.current-product dt {
+  color: #6e83a2;
+}
+.diff-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 5px;
+}
+.diff-chips > span {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: #f0f2f6;
+  color: #6e83a2;
+}
+.diff-chips > span.changed {
+  background: #fff0e6;
+  color: #c4520f;
+  box-shadow: inset 0 0 0 1px #ff792955;
+}
+@media (max-width: 800px) {
+  .match-row,
+  .technical-compare {
+    grid-template-columns: 1fr;
+  }
 }

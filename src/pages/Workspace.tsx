@@ -4,7 +4,6 @@ import { useEstimate, useStore } from '../store'
 import { Detail } from '../components/Detail'
 import { Filters, PositionTable, useFiltered } from '../components/PositionTable'
 import { Empty } from '../components/ui'
-import { ChecksCard } from './Checks'
 import { Split } from '../components/Split'
 
 /**
@@ -20,19 +19,18 @@ export function Workspace() {
   return (
     <Split
       className="workspace review"
-      top={<ChecksCard />}
       left={
         <section className="card positions-list">
           <div className="section-heading">
             <div className="inline">
               <h2>Review</h2>
               <span className="subtitle">
-                {rows.length} positions {sys && `(${sys.name})`} need your sign-off
+                {rows.length} items {sys && `(${sys.name})`} need your sign-off
               </span>
             </div>
           </div>
           <Filters review />
-          <PositionTable rows={rows} mode="review" limit={10} />
+          <PositionTable rows={rows} mode="review" limit={50} />
         </section>
       }
       right={

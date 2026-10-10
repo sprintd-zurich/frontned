@@ -6,6 +6,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Database,
+  FileText,
   HardHat,
   HelpCircle,
   Info,
@@ -37,10 +38,10 @@ export function Detail({ p, mode, rows }: { p: Position; mode: Mode; rows: Posit
   const { override, select, addNote, deleteNote, checksFor } = useDetailActions()
   const busy = useStore((s) => s.busy)
   const rules = useStore((s) => s.rules)
-  const tabs = ['Proposal', 'Tender', 'Discussion', 'Alternatives', 'Technical', 'History', 'Source']
+  const tabs = ['Proposal', 'Discussion', 'History', 'Source']
   const [tab, setTab] = useState(tabs[0])
   const [note, setNote] = useState('')
-  const [modal, setModal] = useState<'' | 'products' | 'rule'>('')
+  const [modal, setModal] = useState<'' | 'products' | 'rule' | 'technical'>('')
   const compact = mode === 'positions'
   useEffect(() => {
     setTab('Proposal')
@@ -61,13 +62,16 @@ export function Detail({ p, mode, rows }: { p: Position; mode: Mode; rows: Posit
   }
   const checks = checksFor(p)
   const history = e.activity.filter((a) => a.lv_id === p.lv_id).reverse()
+  // the quantity comes from the tender; it is only typed in where the tender leaves it blank
+  const fromTender = p.extracted_quantity != null
   const quantity = (
     <label>
       <h4>Quantity</h4>
-      <div className="quantity-input">
+      <div className={`quantity-input ${fromTender ? 'locked' : 'missing'}`} title={fromTender ? `From the tender, page ${p.source_page}` : 'Not in the tender: enter it'}>
         <input
           key={`${p.lv_id}-${p.quantity}`}
           aria-label="Quantity"
+          readOnly={fromTender}
           type="number"
           min="0"
           step="any"
@@ -147,7 +151,6 @@ export function Detail({ p, mode, rows }: { p: Position; mode: Mode; rows: Posit
           {tabs.map((t) => (
             <button key={t} className={tab === t ? 'active' : ''} onClick={() => setTab(t)}>
               {t}
-              {t === 'Alternatives' && ` (${p.alternatives.length})`}
               {t === 'Discussion' && ` (${p.notes.length})`}
               {t === 'Source' && p.sheets.length > 0 && ` (${p.sheets.length})`}
             </button>
@@ -155,17 +158,15 @@ export function Detail({ p, mode, rows }: { p: Position; mode: Mode; rows: Posit
         </div>
       )}
 
-      {tab === 'Alternatives' ? (
-        <Alternatives p={p} choose={(id) => set({ product_id: id }, `${p.lv_id}: product ${id} selected, price recalculated.`)} />
-      ) : tab === 'Source' ? (
-        <Sources p={p} />
-      ) : tab === 'Tender' ? (
+      {tab === 'Source' ? (
         <>
+          <h3 className="detail-group">Tender page</h3>
           <SourceView tenderId={e.tender.id} position={p} pages={e.tender.pages} zoomable />
           <div className="quote">
             <small className="muted">Extracted line</small>
             <code>{p.source_line}</code>
           </div>
+          <Sources p={p} />
         </>
       ) : tab === 'Discussion' ? (
         <div className="notes-history">
@@ -214,13 +215,9 @@ export function Detail({ p, mode, rows }: { p: Position; mode: Mode; rows: Posit
             {p.edited ? `edited by the estimator (${p.edited_fields.join(', ').replace(/_chf|_/g, ' ')})` : 'not edited'}
           </p>
         </div>
-      ) : tab === 'Technical' ? (
-        <>
-          <h3>Extracted from the tender</h3>
-          <Technical p={p} />
-        </>
       ) : (
         <>
+          <h3 className="detail-group">Tender item</h3>
           <div className="description-block">
             <div>
               <h4>Description</h4>
@@ -231,6 +228,27 @@ export function Detail({ p, mode, rows }: { p: Position; mode: Mode; rows: Posit
               {p.description && p.description !== p.title && <p className="clamp">{p.description}</p>}
             </div>
           </div>
+          <div className="quantity-product">
+            {quantity}
+            <div>
+              <h4>Technical details</h4>
+              <button className="product-selector technical-selector" onClick={() => setModal('technical')}>
+                <FileText size={26} />
+                <span>
+                  <strong>
+                    {p.title}
+                    {p.variant && ` · ${p.variant}`}
+                  </strong>
+                  <small>
+                    {Object.keys(p.attributes).length + (p.airflow_m3h ? 1 : 0)} values read from the tender · page {p.source_pages.join(', ')}
+                    {p.components.length > 0 && ` · ${p.components.length} sub-components`}
+                  </small>
+                </span>
+                <ChevronRight size={17} />
+              </button>
+            </div>
+          </div>
+          <h3 className="detail-group">Company data match</h3>
           {company ? (
             <div className="proposal-head ok">
               <Database size={18} />
@@ -271,33 +289,19 @@ export function Detail({ p, mode, rows }: { p: Position; mode: Mode; rows: Posit
               </div>
             </div>
           )}
-          <div className="quantity-product">
-            {quantity}
+          <div className="match-row">
             <div>
               <h4>Selected product</h4>
               {product}
+              {p.alternatives.length > 0 && (
+                <button className="text-button" onClick={() => setModal('products')}>
+                  {p.alternatives.length} comparable product{p.alternatives.length === 1 ? '' : 's'}
+                </button>
+              )}
             </div>
+            <div>{rule}</div>
           </div>
-          {rule}
-          {!compact && (
-            <div className="technical-grid">
-              <section>
-                <h4>Read from the tender</h4>
-                <small>From the tender, page {p.source_page}</small>
-                <Technical p={p} short />
-              </section>
-              <section>
-                <div className="section-heading">
-                  <h4>Matched product</h4>
-                  <button className="text-button" onClick={() => setModal('products')}>
-                    Edit match
-                  </button>
-                </div>
-                <ProductGraphic fire={isFire(p)} />
-                <ProductFacts id={p.product_id} />
-              </section>
-            </div>
-          )}
+          {checks.length > 0 && <h3 className="detail-group">Checks</h3>}
           {checks.length > 0 && (
             <div className={`validation ${checks.some((c) => c.level === 'warning') ? '' : 'calm'}`}>
               <h4>
@@ -311,6 +315,7 @@ export function Detail({ p, mode, rows }: { p: Position; mode: Mode; rows: Posit
               ))}
             </div>
           )}
+          <h3 className="detail-group">Price</h3>
           <label className="status-select">
             <h4>Status</h4>
             <select
@@ -326,7 +331,6 @@ export function Detail({ p, mode, rows }: { p: Position; mode: Mode; rows: Posit
           </label>
           {!compact && (
             <div className="calc-embedded">
-              <h3 className="calc-title">Calculation</h3>
               <UnitCost p={p} onSave={(v) => set({ net_unit_cost_chf: v }, `${p.lv_id}: unit cost set to CHF ${money(v, 2)}.`)} />
               <CostPanel p={p} heading={false} />
             </div>
@@ -386,6 +390,7 @@ export function Detail({ p, mode, rows }: { p: Position; mode: Mode; rows: Posit
           }}
         />
       )}
+      {modal === 'technical' && <TechnicalModal p={p} close={() => setModal('')} editMatch={() => setModal('products')} />}
       {modal === 'rule' && (
         <RuleModal
           p={p}
@@ -507,33 +512,38 @@ export function Technical({ p, short = false }: { p: Position; short?: boolean }
   )
 }
 
-function Alternatives({ p, choose }: { p: Position; choose: (id: string) => void }) {
+/** Everything read from the tender for this position, next to the product it was matched to. */
+function TechnicalModal({ p, close, editMatch }: { p: Position; close: () => void; editMatch: () => void }) {
   return (
-    <div className="alternatives">
-      <h3>Technically comparable products</h3>
-      <p className="muted">From the reference catalogue. Confirm technical suitability before switching.</p>
-      {!p.alternatives.length && <p className="muted">No alternative in the catalogue for this position.</p>}
-      {p.alternatives.map((a) => (
-        <button className="alternative" key={a.product_id} onClick={() => choose(a.product_id)}>
-          <ProductGraphic fire={isFire(a)} />
-          <span>
-            <strong>{a.product_id}</strong>
-            <small>{a.description}</small>
-            <small>
-              {a.reason}
-              {a.supplier_quote_required && ' · supplier quote'}
-            </small>
-          </span>
-          <b>
-            CHF {money(a.net_unit_cost_chf, 2)}
-            <small className={a.material_delta_chf > 0 ? 'up' : 'down'}>
-              {a.material_delta_chf > 0 ? '+' : '−'}
-              {fmtChf(Math.abs(a.material_delta_chf))} material
-            </small>
-          </b>
-        </button>
-      ))}
-    </div>
+    <Modal title={`Technical details · ${p.lv_id}`} close={close} wide>
+      <div className="technical-compare">
+        <section>
+          <h3 className="detail-group">Read from the tender</h3>
+          <small className="muted">Page {p.source_pages.join(', ')}</small>
+          <Technical p={p} />
+        </section>
+        <section>
+          <div className="section-heading">
+            <h3 className="detail-group">Matched product</h3>
+            <button className="text-button" onClick={editMatch}>
+              Change product
+            </button>
+          </div>
+          <ProductGraphic fire={isFire(p)} />
+          <ProductFacts id={p.product_id} />
+          {p.assumptions.length > 0 && (
+            <div className="validation calm">
+              {p.assumptions.map((a, i) => (
+                <div key={i}>
+                  <Info size={14} />
+                  <span>{a}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      </div>
+    </Modal>
   )
 }
 
@@ -541,34 +551,70 @@ function ProductModal({ p, close, choose }: { p: Position; close: () => void; ch
   const catalog = useStore((s) => s.catalog)
   const [q, setQ] = useState('')
   const same = catalog.filter((c) => c.install_code === p.install_code && c.product_id !== p.product_id)
+  const sameOnly = same.filter((c) => !p.alternatives.some((a) => a.product_id === c.product_id))
   const query = q.trim().toLowerCase()
   const found = query
     ? catalog.filter((c) => `${c.product_id} ${c.description} ${c.manufacturer} ${c.model} ${c.category}`.toLowerCase().includes(query))
     : []
   const current = catalog.find((c) => c.product_id === p.product_id)
-  const row = (c: (typeof catalog)[number], note?: string) => (
-    <button key={c.product_id} className={`alternative ${c.product_id === p.product_id ? 'active' : ''}`} onClick={() => choose(c.product_id)}>
-      <ProductGraphic fire={isFire(c)} />
-      <span>
-        <strong>
-          {c.product_id} · {c.manufacturer} {c.model}
-        </strong>
-        <small>{c.description}</small>
-        <small>{note ?? `${c.category} · rule ${c.install_code}`}</small>
-      </span>
-      <b>
-        CHF {money(c.net_cost_chf, 2)}
-        <small>/{unit(c.unit)}</small>
-        {c.product_id === p.product_id && <Check size={16} />}
-      </b>
-    </button>
-  )
+  // what differs from the current proposal is marked, so a switch is a conscious choice
+  const diffs = (c: (typeof catalog)[number]) =>
+    current && c.product_id !== current.product_id
+      ? ([
+          ['Manufacturer', c.manufacturer, current.manufacturer],
+          ['Model', c.model, current.model],
+          ['Type', c.subcategory, current.subcategory],
+          ['Unit', unit(c.unit), unit(current.unit)],
+          ['Installation', c.install_code, current.install_code],
+        ] as const)
+      : []
+  const row = (c: (typeof catalog)[number], note?: string) => {
+    const delta = current ? c.net_cost_chf - current.net_cost_chf : 0
+    return (
+      <button key={c.product_id} className={`alternative ${c.product_id === p.product_id ? 'active' : ''}`} onClick={() => choose(c.product_id)}>
+        <ProductGraphic fire={isFire(c)} />
+        <span>
+          <strong>
+            {c.product_id} · {c.manufacturer} {c.model}
+          </strong>
+          <small>{c.description}</small>
+          <small>{note ?? `${c.category} · rule ${c.install_code}`}</small>
+          {diffs(c).length > 0 && (
+            <span className="diff-chips">
+              {diffs(c).map(([k, v, was]) => (
+                <span key={k} className={String(v) === String(was) ? 'same' : 'changed'} title={String(v) === String(was) ? 'Same as the proposal' : `Proposal: ${was}`}>
+                  {k}: <b>{v}</b>
+                </span>
+              ))}
+            </span>
+          )}
+        </span>
+        <b>
+          CHF {money(c.net_cost_chf, 2)}
+          <small>/{unit(c.unit)}</small>
+          {current && c.product_id !== current.product_id && Math.abs(delta) >= 0.005 && (
+            <small className={delta > 0 ? 'up' : 'down'}>
+              {delta > 0 ? '+' : '−'}
+              {money(Math.abs(delta), 2)} per unit
+            </small>
+          )}
+          {c.product_id === p.product_id && <Check size={16} />}
+        </b>
+      </button>
+    )
+  }
   return (
     <Modal title={`Product matching · ${p.lv_id}`} close={close} wide>
       <p className="muted">
         {p.title}
         {p.variant && ` · ${p.variant}`}. Material and installation time are recalculated as soon as you pick a product.
+        {current && ' Differences to the current proposal are highlighted.'}
       </p>
+      {current && (
+        <div className="current-product">
+          <ProductFacts id={current.product_id} />
+        </div>
+      )}
       <label className="search-field">
         <Search size={15} />
         <input autoFocus placeholder="Search the catalogue…" value={q} onChange={(e) => setQ(e.target.value)} />
@@ -585,8 +631,8 @@ function ProductModal({ p, close, choose }: { p: Position; close: () => void; ch
               const c = catalog.find((x) => x.product_id === a.product_id)
               return c ? row(c, `${a.reason} · ${a.material_delta_chf > 0 ? '+' : '−'}${fmtChf(Math.abs(a.material_delta_chf))} material`) : null
             })}
-            {same.length > 0 && <h4>Same installation rule</h4>}
-            {same.filter((c) => !p.alternatives.some((a) => a.product_id === c.product_id)).map((c) => row(c))}
+            {sameOnly.length > 0 && <h4>Same installation rule</h4>}
+            {sameOnly.map((c) => row(c))}
           </>
         )}
       </div>
