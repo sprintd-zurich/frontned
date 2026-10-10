@@ -28,6 +28,7 @@ import { useEstimate, useStore } from '../store'
 import type { Activity } from '../types'
 import { Button, Modal, Progress, Ring } from '../components/ui'
 import { MetaForm } from './MetaForm'
+import { Workflow } from '../components/Shell'
 
 export function ProjectsSidebar() {
   const { tenders, estimate, open, removeTender, busy } = useStore()
@@ -45,7 +46,7 @@ export function ProjectsSidebar() {
     <aside className="projects-sidebar">
       <div className="section-heading">
         <h3>My tenders</h3>
-        <button className="button small" onClick={() => setImporting(true)}>
+        <button className="button small primary" onClick={() => setImporting(true)}>
           <Plus size={14} /> New tender
         </button>
       </div>
@@ -194,7 +195,7 @@ export function Overview() {
             ['Calculate', 'Material, installation hours, labour and project costs'],
             ['Review', 'Source page, assumptions and alternatives per position'],
             ['Decide', 'Margin, win probability and scenarios'],
-            ['Export', 'Priced tender PDF, offer workbook, supplier RFQs'],
+            ['Export', 'Priced tender PDF and offer workbook'],
           ].map(([t, d], i) => (
             <li key={t}>
               <b>{String(i + 1).padStart(2, '0')}</b>
@@ -217,7 +218,7 @@ function Dashboard() {
   const m = metrics(e.positions)
   const meta = e.tender.meta
   const systems = systemsOf(e.positions)
-  const tabs = ['Dashboard', 'Positions', 'Review', 'Bid', 'Export', 'Details']
+  const tabs = ['Dashboard', 'Positions', 'Review', 'Supplier', 'Experience', 'Bid', 'Export', 'Details']
   const ready = m.open === 0
   return (
     <>
@@ -273,6 +274,7 @@ function Dashboard() {
             </button>
           ))}
         </div>
+        <Workflow stepsOnly />
       </section>
       <div className="metrics">
         {(
@@ -567,7 +569,7 @@ function Tasks({ onOpen }: { onOpen: (lvId: string) => void }) {
         },
       })),
     ...(quotes.length
-      ? [{ name: 'Request supplier quotes', sub: `${quotes.length} positions priced from package benchmarks`, prio: 'Medium' as const, go: () => navigate('/export') }]
+      ? [{ name: 'Request supplier quotes', sub: `${quotes.length} positions priced from package benchmarks`, prio: 'Medium' as const, go: () => navigate('/supplier') }]
       : []),
     ...(calculated.length
       ? [
@@ -635,7 +637,7 @@ function Documents() {
     [e.tender.name, `Original tender · ${e.tender.pages} pages`, 'PDF', () => window.open(api.tenderPdfUrl(e.tender.id), '_blank')],
     ['Priced tender (PDF)', `Prices written into the LV · ${fmtChf(e.project.selling_price_rounded_chf)}`, 'PDF', () => navigate('/export')],
     ['Offer workbook (Excel)', `${m.total} positions with sources · ${blockers} open`, 'XLS', () => navigate('/export')],
-    ['Supplier RFQs', `${e.positions.filter((p) => p.status === 'supplier_quote_required').length} positions in packages`, 'RFQ', () => navigate('/export')],
+    ['Supplier requests', `${e.positions.filter((p) => p.status === 'supplier_quote_required').length} positions wait for a price`, 'RFQ', () => navigate('/supplier')],
   ]
   return (
     <section className="card documents">

@@ -27,6 +27,7 @@ import { SourceView } from './SourceView'
 import { Button, Modal, ProductGraphic, StatusBadge } from './ui'
 import { EditedTag, type Mode } from './PositionTable'
 import { SourceLine } from './Trace'
+import { Sources } from './Sources'
 
 const isFire = (p: { product_id?: string | null; install_code?: string | null }) =>
   !!(p.product_id?.startsWith('P-FIR') || p.install_code?.startsWith('FIRE'))
@@ -36,7 +37,7 @@ export function Detail({ p, mode, rows }: { p: Position; mode: Mode; rows: Posit
   const { override, select, addNote, deleteNote, checksFor } = useDetailActions()
   const busy = useStore((s) => s.busy)
   const rules = useStore((s) => s.rules)
-  const tabs = ['Proposal', 'Source', 'Discussion', 'Alternatives', 'Technical', 'History']
+  const tabs = ['Proposal', 'Tender', 'Discussion', 'Alternatives', 'Technical', 'History', 'Source']
   const [tab, setTab] = useState(tabs[0])
   const [note, setNote] = useState('')
   const [modal, setModal] = useState<'' | 'products' | 'rule'>('')
@@ -148,6 +149,7 @@ export function Detail({ p, mode, rows }: { p: Position; mode: Mode; rows: Posit
               {t}
               {t === 'Alternatives' && ` (${p.alternatives.length})`}
               {t === 'Discussion' && ` (${p.notes.length})`}
+              {t === 'Source' && p.sheets.length > 0 && ` (${p.sheets.length})`}
             </button>
           ))}
         </div>
@@ -156,6 +158,8 @@ export function Detail({ p, mode, rows }: { p: Position; mode: Mode; rows: Posit
       {tab === 'Alternatives' ? (
         <Alternatives p={p} choose={(id) => set({ product_id: id }, `${p.lv_id}: product ${id} selected, price recalculated.`)} />
       ) : tab === 'Source' ? (
+        <Sources p={p} />
+      ) : tab === 'Tender' ? (
         <>
           <SourceView tenderId={e.tender.id} position={p} pages={e.tender.pages} zoomable />
           <div className="quote">
@@ -257,7 +261,7 @@ export function Detail({ p, mode, rows }: { p: Position; mode: Mode; rows: Posit
                   <Package size={14} /> Choose a product
                 </Button>
                 {p.status !== 'supplier_quote_required' && (
-                  <Button className="small" onClick={() => set({ status: 'supplier_quote_required' }, `${p.lv_id} added to the supplier RFQs.`)}>
+                  <Button className="small" onClick={() => set({ status: 'supplier_quote_required' }, `${p.lv_id} added to the Supplier tab.`)}>
                     <MessageSquare size={14} /> Request supplier quote
                   </Button>
                 )}
@@ -343,7 +347,7 @@ export function Detail({ p, mode, rows }: { p: Position; mode: Mode; rows: Posit
         ) : (
           <>
             {p.status !== 'supplier_quote_required' && (
-              <Button disabled={!!busy} onClick={() => set({ status: 'supplier_quote_required' }, `${p.lv_id} added to the supplier RFQs.`)}>
+              <Button disabled={!!busy} onClick={() => set({ status: 'supplier_quote_required' }, `${p.lv_id} added to the Supplier tab.`)}>
                 <MessageSquare size={14} /> Request quote
               </Button>
             )}
