@@ -5794,12 +5794,14 @@ samp {
   letter-spacing: 0.03em;
 }
 
-/* Experience: Opinion / Estimate / File switch, one compact row */
+/* Experience: the Add experience form, same field sizes as the rest of the app */
+.experience-form {
+  align-content: start;
+  gap: 14px;
+}
 .experience-form .segmented {
   display: flex;
   flex: none;
-  align-items: center;
-  height: auto;
   gap: 4px;
   padding: 3px;
   background: #f1f5f9;
@@ -5809,10 +5811,7 @@ samp {
 }
 .experience-form .segmented button {
   flex: 1 1 0;
-  align-self: center;
   height: 34px;
-  max-height: 34px;
-  min-height: 0;
   padding: 0 10px;
   font-size: 13px;
   color: #334155;
@@ -5825,6 +5824,87 @@ samp {
   background: #08266a;
   color: #fff;
 }
-.experience-form {
-  align-content: start;
+.experience-form label {
+  gap: 6px;
+  font-size: 12px;
+  color: #4c648b;
+}
+.experience-form .inline {
+  display: flex;
+  gap: 8px;
+}
+.experience-form input,
+.experience-form select,
+.experience-form textarea {
+  width: 100%;
+  font-size: 13px;
+  font-weight: 400;
+  border-radius: 8px;
+  padding: 0 12px;
+}
+.experience-form input,
+.experience-form select {
+  height: 38px;
+}
+.experience-form textarea {
+  min-height: 96px;
+  padding: 10px 12px;
+  line-height: 1.45;
+}
+.experience-form input:focus,
+.experience-form select:focus,
+.experience-form textarea:focus {
+  outline: none;
+  border-color: #08266a;
+  box-shadow: 0 0 0 3px rgba(8, 38, 106, 0.1);
+}
+.experience-file {
+  display: flex;
+  gap: 6px;
+  align-items: stretch;
+}
+.experience-file-pick {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 12px;
+  font: inherit;
+  font-size: 13px;
+  color: #4c648b;
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  cursor: pointer;
+  min-width: 0;
+}
+.experience-file-pick span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.experience-file-pick:hover {
+  border-color: #08266a;
+  color: #08266a;
+}
+.experience-file.has-file .experience-file-pick {
+  border-style: solid;
+  color: #10284d;
+  background: white;
+}
+.experience-file-clear {
+  width: 38px;
+  display: grid;
+  place-items: center;
+  color: #64748b;
+  background: white;
+  border: 1px solid #dfe5ef;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.experience-form .experience-save {
+  height: 40px;
+  justify-content: center;
+  font-size: 13px;
 }

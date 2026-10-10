@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { AlertTriangle, ArrowRight, Bot, Check, Keyboard, Lightbulb, MessageSquareQuote, Mic, Paperclip, Percent, Plus, Sparkles, Trash2 } from 'lucide-react'
+import { AlertTriangle, ArrowRight, Bot, Check, Keyboard, Lightbulb, MessageSquareQuote, Mic, Paperclip, Percent, Plus, Sparkles, Trash2, X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import { initials, systemsOf } from '../derive'
@@ -518,14 +518,19 @@ function NewEntry() {
           <input type="number" step="0.5" value={pct} placeholder="e.g. 5 or -3" onChange={(ev) => setPct(ev.target.value)} />
         </label>
       )}
-      <div className="experience-file">
-        <Button className="small" onClick={() => input.current?.click()}>
-          <Paperclip size={14} /> {file ? 'Change file' : 'Attach a file'}
-        </Button>
-        {file && <small>{file.name}</small>}
+      <div className={`experience-file ${file ? 'has-file' : ''}`}>
+        <button type="button" className="experience-file-pick" onClick={() => input.current?.click()}>
+          <Paperclip size={15} />
+          <span>{file ? file.name : kind === 'file' ? 'Choose the file' : 'Attach a file (optional)'}</span>
+        </button>
+        {file && (
+          <button type="button" className="experience-file-clear" aria-label="Remove file" onClick={() => setFile(null)}>
+            <X size={14} />
+          </button>
+        )}
         <input ref={input} type="file" hidden onChange={(ev) => setFile(ev.target.files?.[0] ?? null)} />
       </div>
-      <Button primary disabled={!ready} onClick={save}>
+      <Button primary className="experience-save" disabled={!ready} onClick={save}>
         Save experience
       </Button>
     </section>
