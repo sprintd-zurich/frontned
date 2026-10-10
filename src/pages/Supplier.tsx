@@ -1,53 +1,47 @@
 import { useEffect, useMemo, useState } from 'react'
-import { CheckCircle2, Copy, Download, FileSpreadsheet, Mail, PackageSearch, RefreshCw } from 'lucide-react'
+import { Building2, CheckCircle2, Copy, Download, FileSpreadsheet, Mail, PackageSearch, RefreshCw } from 'lucide-react'
 import { api } from '../api'
 import { positionLabel } from '../derive'
 import { fmtChf, fmtNum, unit } from '../format'
 import { useEstimate, useStore } from '../store'
-import type { Position, SupplierDraft, SupplierItem } from '../types'
+import type { Position, SupplierDraft, SupplierInfo, SupplierItem } from '../types'
 import { SheetCard, SheetUpload } from '../components/Sheets'
 import { Split } from '../components/Split'
-import { CategoryStrip } from '../components/Shell'
 import { SourceLine } from '../components/Trace'
 import { Button, Empty } from '../components/ui'
-
-type Show = 'open' | 'received' | 'all'
 
 const received = (p: Position) => !!p.price_sheet
 
 /**
- * Supplier work: the positions still missing a price, grouped by package. Tick the ones to ask for, prepare the
- * request mail on the right, and read prices from the product sheets suppliers send back.
+ * Supplier work: the positions still missing a price, grouped by the supplier who is asked for them. Tick the ones
+ * to ask for (or a whole supplier), prepare the request mail on the right, and read prices from the sheets they send.
  */
 export function Supplier() {
   const e = useEstimate()
-  const { category, search, select, selected, notify } = useStore()
+  const { search, select, selected, notify } = useStore()
   const [items, setItems] = useState<SupplierItem[] | null>(null)
+  const [directory, setDirectory] = useState<SupplierInfo[]>([])
   const [error, setError] = useState('')
   const [ticked, setTicked] = useState<Set<string>>(new Set())
-  const [show, setShow] = useState<Show>('open')
+  const [to, setTo] = useState<SupplierInfo | null>(null)
   useEffect(() => {
     api
       .supplierItems(e.tender.id)
       .then(setItems)
       .catch((err) => setError((err as Error).message))
   }, [e])
+  useEffect(() => {
+    api.suppliers().then(setDirectory).catch(() => setDirectory([]))
+  }, [])
   const byId = useMemo(() => new Map(e.positions.map((p) => [p.lv_id, p])), [e])
   const q = search.trim().toLowerCase()
   const rows = (items ?? [])
     .map((i) => ({ ...i, p: byId.get(i.lv_id)! }))
     .filter(({ p }) => p)
-    .filter(({ p }) => show === 'all' || (show === 'received' ? received(p) : !received(p)))
-    .filter(({ p }) => category === 'all' || p.category === category)
     .filter(({ p }) => !q || `${p.lv_id} ${p.title} ${p.variant} ${p.system}`.toLowerCase().includes(q))
-  const inView = (items ?? [])
-    .map((i) => byId.get(i.lv_id))
-    .filter((p): p is Position => !!p && (category === 'all' || p.category === category))
-  const counts = { open: inView.filter((p) => !received(p)).length, received: inView.filter(received).length, all: inView.length }
-  const groups = [...new Set(rows.map((r) => r.package_title))].map((title) => ({
-    title,
-    rows: rows.filter((r) => r.package_title === title),
-  }))
+  const groups = directory
+    .map((sup) => ({ sup, rows: rows.filter((r) => r.supplier === sup.id) }))
+    .filter((g) => g.rows.length)
   const toggle = (ids: string[], on: boolean) =>
     setTicked((t) => {
       const n = new Set(t)
@@ -56,7 +50,12 @@ export function Supplier() {
     })
   const chosen = e.positions.filter((p) => ticked.has(p.lv_id))
   const focus = byId.get(selected ?? '')
-  const open = (items ?? []).filter((i) => byId.get(i.lv_id) && !received(byId.get(i.lv_id)!)).length
+  const open = rows.filter(({ p }) => !received(p)).length
+  // asking one supplier for all of its open items: tick them and fill in the address
+  const ask = (sup: SupplierInfo, ids: string[]) => {
+    setTicked(new Set(ids))
+    setTo(sup)
+  }
 
   return (
     <Split
@@ -66,22 +65,10 @@ export function Supplier() {
           <div className="section-heading">
             <div className="inline">
               <h2>Supplier</h2>
-              <span className="subtitle">{open} positions still need a supplier price</span>
+              <span className="subtitle">
+                {open} items still need a supplier price · {groups.length} suppliers
+              </span>
             </div>
-          </div>
-          <CategoryStrip />
-          <div className="filter-pills status-pills">
-            {(
-              [
-                ['open', 'Missing price', 'violet'],
-                ['received', 'Priced from a sheet', 'success'],
-                ['all', 'All', 'neutral'],
-              ] as const
-            ).map(([k, label, tone]) => (
-              <button key={k} className={`tone-${tone} ${show === k ? 'active' : ''}`} onClick={() => setShow(k)}>
-                {label} <span>{counts[k]}</span>
-              </button>
-            ))}
           </div>
           <div className="supplier-select-bar">
             <label className="check-field">
@@ -95,7 +82,7 @@ export function Supplier() {
                   )
                 }
               />
-              Select all shown ({rows.length})
+              Select all ({rows.length})
             </label>
             {ticked.size > 0 && (
               <button className="text-button" onClick={() => setTicked(new Set())}>
@@ -103,6 +90,7 @@ export function Supplier() {
               </button>
             )}
           </div>
+          {directory.some((d) => d.demo) && <small className="muted demo-note">Demo suppliers: invented companies and contacts until the real supplier list is added.</small>}
           {error && <div className="notice">{error}</div>}
           {!items && !error && (
             <div className="loading-state">
@@ -111,61 +99,76 @@ export function Supplier() {
           )}
           {items && !rows.length && (
             <Empty icon={<CheckCircle2 size={28} />} title="Nothing here">
-              {show === 'open' ? 'Every position has a price.' : 'No position matches the filters.'}
+              Every position has a price.
             </Empty>
           )}
-          {groups.map((g) => (
-            <div className="supplier-group" key={g.title}>
-              <label className="supplier-group-head">
-                <input
-                  type="checkbox"
-                  checked={g.rows.every((r) => ticked.has(r.lv_id))}
-                  onChange={(ev) =>
-                    toggle(
-                      g.rows.map((r) => r.lv_id),
-                      ev.target.checked,
-                    )
-                  }
-                />
-                <strong>{g.title}</strong>
-                <span>{g.rows.length}</span>
-              </label>
-              {g.rows.map(({ p }) => (
-                <div
-                  key={p.lv_id}
-                  className={`supplier-row ${p.lv_id === focus?.lv_id ? 'active' : ''}`}
-                  onClick={() => select(p.lv_id)}
-                >
+          {groups.map(({ sup, rows: gr }) => {
+            const missing = gr.filter(({ p }) => !received(p))
+            return (
+              <div className={`supplier-group ${to?.id === sup.id ? 'addressed' : ''}`} key={sup.id}>
+                <div className="supplier-group-head">
                   <input
                     type="checkbox"
-                    aria-label={`Select ${p.lv_id}`}
-                    checked={ticked.has(p.lv_id)}
-                    onClick={(ev) => ev.stopPropagation()}
-                    onChange={(ev) => toggle([p.lv_id], ev.target.checked)}
+                    aria-label={`Select all items for ${sup.name}`}
+                    checked={gr.every((r) => ticked.has(r.lv_id))}
+                    onChange={(ev) =>
+                      toggle(
+                        gr.map((r) => r.lv_id),
+                        ev.target.checked,
+                      )
+                    }
                   />
-                  <span className="lv">{p.lv_id}</span>
-                  <span className="text">
-                    <strong>{positionLabel(p)}</strong>
+                  <Building2 size={16} />
+                  <span className="supplier-who">
+                    <strong>{sup.name}</strong>
                     <small>
-                      {p.system.split(' ')[0]} · p. {p.source_page}
-                      {p.sheets.length > 0 && ` · ${p.sheets.length} sheet${p.sheets.length > 1 ? 's' : ''}`}
+                      {sup.contact} · {sup.city} · {[...new Set(gr.map((r) => r.package_title))].join(', ')}
                     </small>
                   </span>
-                  <span className="qty">
-                    {fmtNum(p.quantity)} {unit(p.unit)}
+                  <span className="supplier-count">
+                    {missing.length}/{gr.length}
                   </span>
-                  <span className={`supplier-state ${received(p) ? 'ok' : p.net_unit_cost_chf == null ? 'missing' : 'budget'}`}>
-                    {received(p) ? 'From sheet' : p.net_unit_cost_chf == null ? 'No price' : 'Budget'}
-                  </span>
+                  <Button className="small" onClick={() => ask(sup, (missing.length ? missing : gr).map((r) => r.lv_id))}>
+                    <Mail size={13} /> Request
+                  </Button>
                 </div>
-              ))}
-            </div>
-          ))}
+                {gr.map(({ p, package_title }) => (
+                  <div
+                    key={p.lv_id}
+                    className={`supplier-row ${p.lv_id === focus?.lv_id ? 'active' : ''}`}
+                    onClick={() => select(p.lv_id)}
+                  >
+                    <input
+                      type="checkbox"
+                      aria-label={`Select ${p.lv_id}`}
+                      checked={ticked.has(p.lv_id)}
+                      onClick={(ev) => ev.stopPropagation()}
+                      onChange={(ev) => toggle([p.lv_id], ev.target.checked)}
+                    />
+                    <span className="lv">{p.lv_id}</span>
+                    <span className="text">
+                      <strong>{positionLabel(p)}</strong>
+                      <small>
+                        {package_title} · {p.system.split(' ')[0]} · p. {p.source_page}
+                        {p.sheets.length > 0 && ` · ${p.sheets.length} sheet${p.sheets.length > 1 ? 's' : ''}`}
+                      </small>
+                    </span>
+                    <span className="qty">
+                      {fmtNum(p.quantity)} {unit(p.unit)}
+                    </span>
+                    <span className={`supplier-state ${received(p) ? 'ok' : p.net_unit_cost_chf == null ? 'missing' : 'budget'}`}>
+                      {received(p) ? 'From sheet' : p.net_unit_cost_chf == null ? 'No price' : 'Budget'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )
+          })}
         </section>
       }
       right={
         <section className="card supplier-detail">
-          <MailDraft chosen={chosen} notify={notify} />
+          <MailDraft chosen={chosen} notify={notify} to={to} directory={directory} />
           <h3 className="supplier-section-title">{chosen.length ? `Selected positions (${chosen.length})` : 'Position'}</h3>
           {(chosen.length ? chosen.slice(0, 6) : focus ? [focus] : []).map((p) => (
             <PositionFacts key={p.lv_id} p={p} />
@@ -184,11 +187,27 @@ export function Supplier() {
   )
 }
 
-function MailDraft({ chosen, notify }: { chosen: Position[]; notify: (s: string) => void }) {
+function MailDraft({
+  chosen,
+  notify,
+  to,
+  directory,
+}: {
+  chosen: Position[]
+  notify: (s: string) => void
+  to: SupplierInfo | null
+  directory: SupplierInfo[]
+}) {
   const e = useEstimate()
   const [supplier, setSupplier] = useState('')
   const [contact, setContact] = useState('')
   const [email, setEmail] = useState('')
+  useEffect(() => {
+    if (!to) return
+    setSupplier(to.name)
+    setContact(to.contact)
+    setEmail(to.email)
+  }, [to])
   const [draft, setDraft] = useState<SupplierDraft | null>(null)
   const [subject, setSubject] = useState('')
   const [body, setBody] = useState('')
@@ -196,11 +215,11 @@ function MailDraft({ chosen, notify }: { chosen: Position[]; notify: (s: string)
   const ids = chosen.map((p) => p.lv_id)
   const key = ids.join(',')
   const makers = useMemo(() => {
-    const m = new Set<string>()
+    const m = new Set<string>(directory.map((d) => d.name))
     e.sheets.forEach((s) => s.supplier && m.add(s.supplier))
     chosen.forEach((p) => p.attributes.Fabrikat && m.add(String(p.attributes.Fabrikat)))
     return [...m]
-  }, [e, chosen])
+  }, [e, chosen, directory])
   const build = () => {
     if (!ids.length) {
       setDraft(null)
@@ -237,8 +256,15 @@ function MailDraft({ chosen, notify }: { chosen: Position[]; notify: (s: string)
           <input
             list="supplier-names"
             value={supplier}
-            placeholder="e.g. Trox Hesco"
-            onChange={(ev) => setSupplier(ev.target.value)}
+            placeholder="Choose or type a supplier"
+            onChange={(ev) => {
+              setSupplier(ev.target.value)
+              const d = directory.find((x) => x.name === ev.target.value)
+              if (d) {
+                setContact(d.contact)
+                setEmail(d.email)
+              }
+            }}
           />
           <datalist id="supplier-names">
             {makers.map((m) => (

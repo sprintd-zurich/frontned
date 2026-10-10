@@ -178,6 +178,20 @@ export interface SupplierItem {
   lv_id: string
   package: string
   package_title: string
+  /** id in the supplier directory */
+  supplier: string
+}
+
+/** A supplier from the directory (demo companies until real supplier data is in). */
+export interface SupplierInfo {
+  id: string
+  name: string
+  contact: string
+  email: string
+  phone: string
+  city: string
+  packages: string[]
+  demo: boolean
 }
 
 export interface SupplierDraft {

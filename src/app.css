@@ -3739,3 +3739,43 @@ body.resizing img {
 .calculation-table td:last-child {
   width: 1%;
 }
+
+/* ---------- supplier tab grouped by supplier ---------- */
+.supplier-group-head {
+  padding: 10px 10px;
+  cursor: default;
+}
+.supplier-group-head > svg {
+  color: #476391;
+  flex-shrink: 0;
+}
+.supplier-group-head span.supplier-who {
+  margin-left: 0;
+  flex: 1;
+  min-width: 0;
+  background: none;
+  padding: 0;
+  font-size: 12px;
+  color: #072a58;
+  display: grid;
+  gap: 2px;
+}
+.supplier-who small {
+  font-size: 10px;
+  color: #6881a4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.supplier-group-head span.supplier-count {
+  margin-left: 0;
+}
+.supplier-group.addressed .supplier-group-head {
+  box-shadow: inset 0 0 0 1.5px #0785ff;
+  background: #eef6ff;
+}
+.demo-note {
+  display: block;
+  font-size: 10px;
+  margin: 0 2px 8px;
+}

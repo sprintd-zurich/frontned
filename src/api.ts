@@ -7,6 +7,7 @@ import type {
   RfqPackage,
   SupplierDraft,
   TalkTurn,
+  SupplierInfo,
   SupplierItem,
   SourceLocation,
   TenderSummary,
@@ -82,6 +83,7 @@ export const api = {
     ),
   /** a path the backend returned (trace links, files) as a full URL */
   href: (path: string) => `${BASE}${path}`,
+  suppliers: () => call<SupplierInfo[]>('/api/suppliers'),
   supplierItems: (id: string) => call<SupplierItem[]>(`/api/tenders/${id}/supplier/items`),
   supplierDraft: (id: string, lv_ids: string[], supplier: string, contact: string) =>
     call<SupplierDraft>(`/api/tenders/${id}/supplier/draft`, json('POST', { lv_ids, supplier, contact })),
