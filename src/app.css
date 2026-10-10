@@ -3289,3 +3289,28 @@ body.resizing img {
     grid-template-columns: 1fr;
   }
 }
+
+/* ---------- experience: the input window and the entries share one height ---------- */
+.experience-grid {
+  align-items: stretch;
+}
+.experience-grid > div:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+}
+.experience-grid > div > .card {
+  flex: 1;
+}
+.experience-entries {
+  display: flex;
+  flex-direction: column;
+}
+@media (min-width: 1101px) {
+  .experience-grid .talk {
+    display: flex;
+    flex-direction: column;
+  }
+  .experience-grid .talk-log {
+    flex: 1;
+  }
+}

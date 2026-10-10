@@ -99,7 +99,7 @@ function Entries() {
   const entries = [...e.experience].reverse().filter((x) => kind === 'all' || x.kind === kind)
   const usedIds = new Set(e.bid_suggestion?.entries_used.map((u) => u.id) ?? [])
   return (
-    <section className="card">
+    <section className="card experience-entries">
       <div className="section-heading">
         <h2>Entries</h2>
         <div className="filter-pills">
