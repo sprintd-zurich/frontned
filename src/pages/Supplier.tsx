@@ -1,11 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Building2, CheckCircle2, Copy, Download, FileSpreadsheet, Mail, PackageSearch, RefreshCw } from 'lucide-react'
+import { Building2, CheckCircle2, Copy, FileSpreadsheet, Mail, PackageSearch, RefreshCw } from 'lucide-react'
 import { api } from '../api'
 import { positionLabel } from '../derive'
 import { fmtChf, fmtNum, unit } from '../format'
 import { useEstimate, useStore } from '../store'
 import type { Position, SupplierDraft, SupplierInfo, SupplierItem } from '../types'
-import { SheetCard, SheetUpload } from '../components/Sheets'
 import { Split } from '../components/Split'
 import { SourceLine } from '../components/Trace'
 import { Button, Empty } from '../components/ui'
@@ -125,9 +124,6 @@ export function Supplier() {
                       {sup.contact} · {sup.city} · {[...new Set(gr.map((r) => r.package_title))].join(', ')}
                     </small>
                   </span>
-                  <span className="supplier-count">
-                    {missing.length}/{gr.length}
-                  </span>
                   <Button className="small" onClick={() => ask(sup, (missing.length ? missing : gr).map((r) => r.lv_id))}>
                     <Mail size={13} /> Request
                   </Button>
@@ -150,14 +146,10 @@ export function Supplier() {
                       <strong>{positionLabel(p)}</strong>
                       <small>
                         {package_title} · {p.system.split(' ')[0]} · p. {p.source_page}
-                        {p.sheets.length > 0 && ` · ${p.sheets.length} sheet${p.sheets.length > 1 ? 's' : ''}`}
                       </small>
                     </span>
                     <span className="qty">
                       {fmtNum(p.quantity)} {unit(p.unit)}
-                    </span>
-                    <span className={`supplier-state ${received(p) ? 'ok' : p.net_unit_cost_chf == null ? 'missing' : 'budget'}`}>
-                      {received(p) ? 'From sheet' : p.net_unit_cost_chf == null ? 'No price' : 'Budget'}
                     </span>
                   </div>
                 ))}
@@ -175,12 +167,6 @@ export function Supplier() {
           ))}
           {chosen.length > 6 && <small className="muted">+ {chosen.length - 6} more in the request</small>}
           {!chosen.length && !focus && <p className="muted">Tick positions on the left to prepare a request.</p>}
-          <h3 className="supplier-section-title">Product sheets</h3>
-          <SheetUpload
-            lvIds={chosen.length ? chosen.map((p) => p.lv_id) : focus ? [focus.lv_id] : []}
-            label="Upload product sheets from the supplier"
-          />
-          <SheetsFor positions={chosen.length ? chosen : focus ? [focus] : []} />
         </section>
       }
     />
@@ -365,29 +351,5 @@ function PositionFacts({ p }: { p: Position }) {
         <SourceLine trace={p.trace.net_unit_cost_chf} />
       </div>
     </div>
-  )
-}
-
-function SheetsFor({ positions }: { positions: Position[] }) {
-  const e = useEstimate()
-  const ids = new Set(positions.map((p) => p.lv_id))
-  const sheets = e.sheets.filter((s) => s.lv_ids.some((i) => ids.has(i)))
-  const rest = e.sheets.filter((s) => !sheets.includes(s))
-  return (
-    <>
-      {sheets.map((s) => (
-        <SheetCard key={s.id} sheet={s} targets={positions.filter((p) => s.lv_ids.includes(p.lv_id))} />
-      ))}
-      {rest.length > 0 && (
-        <details className="other-sheets">
-          <summary>
-            <Download size={13} /> Other sheets of this tender ({rest.length})
-          </summary>
-          {rest.map((s) => (
-            <SheetCard key={s.id} sheet={s} targets={positions} />
-          ))}
-        </details>
-      )}
-    </>
   )
 }

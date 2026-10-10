@@ -3779,3 +3779,6 @@ body.resizing img {
   font-size: 10px;
   margin: 0 2px 8px;
 }
+.supplier-list .supplier-row {
+  grid-template-columns: 16px 56px minmax(0, 1fr) auto;
+}
