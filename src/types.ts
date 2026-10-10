@@ -124,8 +124,85 @@ export interface Experience {
   scope: 'project' | 'system' | 'category' | 'position'
   ref: string
   adjustment_pct: number | null
+  /** which cost of the covered positions the percentage is taken of (older entries: 'all') */
+  applies_to?: ExperienceApplies
+  /** interview drafts stay false until the estimator confirms them (older entries: true) */
+  accepted?: boolean
+  source?: 'manual' | 'interview'
+  /** why it matters for the price (entries confirmed from an interview) */
+  reason?: string
   author: string | null
   file: { name: string; stored: string } | null
+}
+
+export type ExperienceApplies = 'all' | 'material' | 'labour'
+
+/** One accepted estimate applied to the price: its percentage of the covered positions' cost. */
+export interface ExperienceLine {
+  id: string
+  text: string
+  scope: Experience['scope']
+  ref: string
+  applies_to: ExperienceApplies
+  adjustment_pct: number
+  positions: number
+  base_chf: number
+  effect_chf: number
+}
+
+/** A topic the interview asks about, picked from the tender's own data. */
+export interface InterviewTopic {
+  id: string
+  kind: string
+  title: string
+  detail: string
+  scope: Experience['scope']
+  ref: string
+}
+
+export interface InterviewTurn {
+  role: 'agent' | 'estimator'
+  text: string
+  type?: 'opening' | 'clarify' | 'probe' | 'closing'
+  topic_id?: string
+  at: string
+}
+
+/** An Experience entry the AI drafted from an answer; nothing is saved until the estimator confirms. */
+export interface InterviewDraft {
+  id: string
+  kind: 'opinion' | 'estimate'
+  text: string
+  reason: string
+  scope: Experience['scope']
+  ref: string
+  applies_to: ExperienceApplies
+  adjustment_pct: number | null
+  /** checks that failed against the tender, e.g. an unknown system that was set to the whole tender */
+  flags: string[]
+  status: 'keep' | 'drop' | 'replaced' | 'confirmed'
+}
+
+export interface InterviewSession {
+  id: string
+  at: string
+  status: 'active' | 'done' | 'confirmed' | 'discarded'
+  topics: InterviewTopic[]
+  turns: InterviewTurn[]
+  drafts: InterviewDraft[]
+  provider: 'claude' | 'apertus' | null
+}
+
+export interface AiStatus {
+  llm: { provider: 'claude' | 'apertus' | null; model: string | null }
+  voice: { speak: boolean; listen: boolean }
+}
+
+export interface ExperienceEffect {
+  lines: ExperienceLine[]
+  total_chf: number
+  /** false when the estimator switched the adjustments off for the price */
+  applied: boolean
 }
 
 export interface SupplierItem {
@@ -302,6 +379,7 @@ export interface Estimate {
   activity: Activity[]
   sheets: Sheet[]
   experience: Experience[]
+  experience_effect: ExperienceEffect
 }
 
 export interface CatalogItem {

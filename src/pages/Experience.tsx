@@ -1,11 +1,12 @@
 import { useRef, useState } from 'react'
-import { Lightbulb, MessageSquareQuote, Paperclip, Percent, Sparkles, Trash2, TrendingUp } from 'lucide-react'
+import { Bot, Calculator, Lightbulb, MessageSquareQuote, Paperclip, Pencil, Percent, Trash2, TrendingUp } from 'lucide-react'
 import { api } from '../api'
 import { initials, systemsOf } from '../derive'
-import { fmtWhen } from '../format'
+import { fmtChf, fmtWhen } from '../format'
 import { useEstimate, useStore } from '../store'
-import type { Experience as Entry } from '../types'
+import type { Category, Experience as Entry, ExperienceApplies } from '../types'
 import { Button, Empty } from '../components/ui'
+import { Interview } from '../components/Interview'
 
 const KINDS = [
   ['opinion', 'Opinion', MessageSquareQuote],
@@ -20,16 +21,42 @@ const SCOPES = [
   ['position', 'Position'],
 ] as const
 
+const APPLIES: [ExperienceApplies, string][] = [
+  ['all', 'material + labour'],
+  ['labour', 'labour'],
+  ['material', 'material'],
+]
+const appliesLabel = (a: ExperienceApplies | undefined) => APPLIES.find(([k]) => k === (a ?? 'all'))?.[1] ?? a
+const signedChf = (v: number) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${fmtChf(Math.abs(v))}`
+const MODE_KEY = 'equans-experience-mode'
+function savedMode(): 'interview' | 'manual' {
+  try {
+    return localStorage.getItem(MODE_KEY) === 'manual' ? 'manual' : 'interview'
+  } catch {
+    return 'interview'
+  }
+}
+
 /**
- * The estimators' own experience for this tender: opinions, estimates with a suggested adjustment, and files.
- * Kept with the tender so it can later adjust the bid scenarios from history and experience; prices are not changed yet.
+ * The estimators' own experience for this tender: opinions, estimates with an adjustment, and files.
+ * An estimate's percentage is applied to the cost of what it covers and flows into the price and the bid range,
+ * unless the estimator switches the adjustments off.
  */
 export function Experience() {
   const e = useEstimate()
   const [kind, setKind] = useState<Entry['kind'] | 'all'>('all')
   const entries = [...e.experience].reverse().filter((x) => kind === 'all' || x.kind === kind)
-  const estimates = e.experience.filter((x) => x.adjustment_pct != null)
-  const net = estimates.reduce((s, x) => s + (x.adjustment_pct ?? 0), 0)
+  const fx = e.experience_effect
+  const act = useStore((s) => s.act)
+  const [mode, setMode] = useState(savedMode)
+  const pickMode = (m: 'interview' | 'manual') => {
+    setMode(m)
+    try {
+      localStorage.setItem(MODE_KEY, m)
+    } catch {
+      /* remembered for this visit only */
+    }
+  }
   return (
     <div className="experience-page">
       <section className="card experience-intro">
@@ -39,19 +66,38 @@ export function Experience() {
           <h1>Experience</h1>
           <p>
             Everything the team knows that the tender and the company data don't: opinions on risks, own estimates, lessons from
-            similar jobs, photos and files. Entries are kept with the tender.
+            similar jobs, photos and files. Estimates with a percentage change the price.
           </p>
         </div>
-        <div className="experience-future">
-          <Sparkles size={16} />
-          <span>
-            <strong>Planned</strong>
-            <small>These entries will feed adjustments to the bid scenarios based on history and experience.</small>
-          </span>
+        <div className={`experience-future ${fx.lines.length && !fx.applied ? 'off' : ''}`}>
+          <Calculator size={16} />
+          {fx.lines.length ? (
+            <span>
+              <strong>{fx.applied ? `${signedChf(fx.total_chf)} in the price` : 'Left out of the price'}</strong>
+              <small>
+                {fx.lines.length} estimate{fx.lines.length === 1 ? '' : 's'} ·{' '}
+                {fx.applied ? 'added to the direct cost before overhead and margin' : `would add ${signedChf(fx.total_chf)}`}
+              </small>
+            </span>
+          ) : (
+            <span>
+              <strong>Estimates change the price</strong>
+              <small>A percentage is taken of the cost of what the estimate covers, then carries overhead and margin.</small>
+            </span>
+          )}
         </div>
       </section>
-      <div className="experience-grid">
-        <NewEntry />
+      <div className="segmented experience-mode">
+        <button className={mode === 'interview' ? 'active' : ''} onClick={() => pickMode('interview')}>
+          <Bot size={14} /> Interview with AI
+        </button>
+        <button className={mode === 'manual' ? 'active' : ''} onClick={() => pickMode('manual')}>
+          <Pencil size={14} /> Add manually
+        </button>
+      </div>
+      {mode === 'interview' && <Interview />}
+      <div className={`experience-grid ${mode === 'interview' ? 'no-form' : ''}`}>
+        {mode === 'manual' && <NewEntry />}
         <section className="card">
           <div className="section-heading">
             <h2>Entries</h2>
@@ -72,33 +118,49 @@ export function Experience() {
           )}
         </section>
         <section className="card experience-preview">
-          <h2>
-            <TrendingUp size={18} /> Suggested adjustments
-          </h2>
-          <p className="muted">Collected from the estimates. Not applied to the price yet.</p>
-          {estimates.length ? (
-            <>
-              {estimates.map((x) => (
-                <div className="adjustment-row" key={x.id}>
-                  <span>{x.text || x.file?.name}</span>
-                  <small>{scopeLabel(x)}</small>
-                  <b className={(x.adjustment_pct ?? 0) >= 0 ? 'up' : 'down'}>
-                    {(x.adjustment_pct ?? 0) > 0 ? '+' : ''}
-                    {x.adjustment_pct}%
-                  </b>
+          <div className="section-heading">
+            <h2>
+              <TrendingUp size={18} /> Effect on the price
+            </h2>
+            {fx.lines.length > 0 && (
+              <label className="experience-switch">
+                <input
+                  type="checkbox"
+                  checked={fx.applied}
+                  onChange={(ev) => {
+                    const on = ev.target.checked
+                    act('Updating the price…', (tid) => api.setExperienceApply(tid, on), on ? 'Estimates applied.' : 'Estimates left out.')
+                  }}
+                />
+                Apply
+              </label>
+            )}
+          </div>
+          <p className="muted">
+            {fx.applied
+              ? 'Each estimate is a percentage of the cost of what it covers, added before overhead and margin.'
+              : 'Switched off: the estimates are kept but left out of the price and the bid.'}
+          </p>
+          {fx.lines.length ? (
+            <div className={fx.applied ? '' : 'experience-off'}>
+              {fx.lines.map((l) => (
+                <div className="adjustment-row" key={l.id}>
+                  <span title={l.text}>{l.text || 'Estimate'}</span>
+                  <small>
+                    {scopeLabel(l, e.categories)} · {l.adjustment_pct > 0 ? '+' : ''}
+                    {l.adjustment_pct}% of {appliesLabel(l.applies_to)} {fmtChf(l.base_chf)}
+                  </small>
+                  <b className={l.effect_chf >= 0 ? 'up' : 'down'}>{signedChf(l.effect_chf)}</b>
                 </div>
               ))}
               <div className="adjustment-row total">
-                <span>Sum of suggestions</span>
-                <small />
-                <b className={net >= 0 ? 'up' : 'down'}>
-                  {net > 0 ? '+' : ''}
-                  {Math.round(net * 10) / 10}%
-                </b>
+                <span>{fx.applied ? 'Added to the direct cost' : 'Would add to the direct cost'}</span>
+                <small>{fx.applied && `selling price now ${fmtChf(e.project.selling_price_rounded_chf)}`}</small>
+                <b className={fx.total_chf >= 0 ? 'up' : 'down'}>{signedChf(fx.total_chf)}</b>
               </div>
-            </>
+            </div>
           ) : (
-            <p className="muted">An estimate with a percentage shows up here.</p>
+            <p className="muted">An estimate with a percentage shows up here with its effect in CHF.</p>
           )}
         </section>
       </div>
@@ -106,9 +168,11 @@ export function Experience() {
   )
 }
 
-function scopeLabel(x: Entry) {
+function scopeLabel(x: Pick<Entry, 'scope' | 'ref'>, categories: Category[]) {
   const s = SCOPES.find(([k]) => k === x.scope)?.[1] ?? x.scope
-  return x.scope === 'project' ? s : `${s} ${x.ref}`
+  if (x.scope === 'project') return s
+  const ref = x.scope === 'category' ? (categories.find((c) => c.id === x.ref || c.label === x.ref)?.label ?? x.ref) : x.ref
+  return `${s} ${ref}`
 }
 
 function EntryRow({ x }: { x: Entry }) {
@@ -123,16 +187,22 @@ function EntryRow({ x }: { x: Entry }) {
           <span className={`experience-kind ${x.kind}`}>
             <Icon size={12} /> {KINDS.find(([k]) => k === x.kind)?.[1]}
           </span>
+          {x.source === 'interview' && (
+            <span className="experience-kind interview">
+              <Bot size={12} /> Interview
+            </span>
+          )}
           <small>
-            {scopeLabel(x)} · {x.author ? `${x.author} · ` : ''}
+            {scopeLabel(x, e.categories)} · {x.author ? `${x.author} · ` : ''}
             {fmtWhen(x.at)}
           </small>
         </div>
         {x.text && <p>{x.text}</p>}
+        {x.reason && <small className="muted experience-reason">{x.reason}</small>}
         {x.adjustment_pct != null && (
           <small className="muted">
-            Suggested adjustment {x.adjustment_pct > 0 ? '+' : ''}
-            {x.adjustment_pct}%
+            Adjustment {x.adjustment_pct > 0 ? '+' : ''}
+            {x.adjustment_pct}% of {appliesLabel(x.applies_to)}
           </small>
         )}
         {x.file && (
@@ -160,13 +230,14 @@ function NewEntry() {
   const [ref, setRef] = useState('')
   const [text, setText] = useState('')
   const [pct, setPct] = useState('')
+  const [applies, setApplies] = useState<ExperienceApplies>('all')
   const [file, setFile] = useState<File | null>(null)
   const input = useRef<HTMLInputElement>(null)
   const refs: [string, string][] =
     scope === 'system'
       ? systemsOf(e.positions).map((s) => [s.id, s.id])
       : scope === 'category'
-        ? e.categories.map((c) => [c.label, c.label])
+        ? e.categories.map((c) => [c.id, c.label])
         : scope === 'position'
           ? e.positions.map((p) => [p.lv_id, `${p.lv_id} ${p.title}`.slice(0, 70)])
           : []
@@ -183,6 +254,7 @@ function NewEntry() {
             scope,
             ref: scope === 'project' ? '' : ref,
             adjustment_pct: kind === 'estimate' ? pct : '',
+            applies_to: kind === 'estimate' ? applies : 'all',
             author: e.tender.meta.estimator,
           },
           file,
@@ -192,6 +264,7 @@ function NewEntry() {
     if (ok) {
       setText('')
       setPct('')
+      setApplies('all')
       setFile(null)
     }
   }
@@ -250,8 +323,17 @@ function NewEntry() {
       </label>
       {kind === 'estimate' && (
         <label>
-          <span>Suggested adjustment to the price (%)</span>
-          <input type="number" step="0.5" value={pct} placeholder="e.g. 5 or -3" onChange={(ev) => setPct(ev.target.value)} />
+          <span>Adjustment (%)</span>
+          <div className="inline">
+            <input type="number" step="0.5" value={pct} placeholder="e.g. 5 or -3" onChange={(ev) => setPct(ev.target.value)} />
+            <select value={applies} onChange={(ev) => setApplies(ev.target.value as ExperienceApplies)} aria-label="Applies to">
+              {APPLIES.map(([k, l]) => (
+                <option key={k} value={k}>
+                  of {l}
+                </option>
+              ))}
+            </select>
+          </div>
         </label>
       )}
       <div className="experience-file">

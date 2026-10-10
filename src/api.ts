@@ -1,6 +1,9 @@
 import type {
+  AiStatus,
   CatalogItem,
   Estimate,
+  InterviewDraft,
+  InterviewSession,
   Meta,
   Parameters,
   PositionOverride,
@@ -99,6 +102,30 @@ export const api = {
     if (file) form.append('file', file)
     return call<Estimate>(`/api/tenders/${id}/experience`, { method: 'POST', body: form })
   },
+  setExperienceApply: (id: string, apply: boolean) =>
+    call<Estimate>(`/api/tenders/${id}/experience/settings`, json('PATCH', { apply })),
   deleteExperience: (id: string, eid: string) => call<Estimate>(`/api/tenders/${id}/experience/${eid}`, { method: 'DELETE' }),
   experienceFileUrl: (id: string, eid: string) => `${BASE}/api/tenders/${id}/experience/${eid}/file`,
+  aiStatus: () => call<AiStatus>('/api/ai/status'),
+  getInterview: (id: string) => call<InterviewSession | null>(`/api/tenders/${id}/interview`),
+  startInterview: (id: string) => call<InterviewSession>(`/api/tenders/${id}/interview`, { method: 'POST' }),
+  answerInterview: (id: string, iid: string, text: string) =>
+    call<InterviewSession>(`/api/tenders/${id}/interview/${iid}/answer`, json('POST', { text })),
+  finishInterview: (id: string, iid: string) =>
+    call<InterviewSession>(`/api/tenders/${id}/interview/${iid}/finish`, { method: 'POST' }),
+  editDraft: (id: string, iid: string, did: string, body: Partial<InterviewDraft> & { clear_pct?: boolean }) =>
+    call<InterviewSession>(`/api/tenders/${id}/interview/${iid}/drafts/${did}`, json('PATCH', body)),
+  confirmInterview: (id: string, iid: string) =>
+    call<{ session: InterviewSession; estimate: Estimate }>(`/api/tenders/${id}/interview/${iid}/confirm`, json('POST', {})),
+  discardInterview: (id: string, iid: string) => call<{ ok: boolean }>(`/api/tenders/${id}/interview/${iid}`, { method: 'DELETE' }),
+  transcribe: (id: string, audio: Blob) => {
+    const form = new FormData()
+    form.append('file', audio, audio.type.includes('mp4') ? 'recording.mp4' : 'recording.webm')
+    return call<{ text: string; provider: string }>(`/api/tenders/${id}/voice/transcribe`, { method: 'POST', body: form })
+  },
+  speak: async (id: string, text: string) => {
+    const res = await fetch(`${BASE}/api/tenders/${id}/voice/speak`, json('POST', { text }))
+    if (!res.ok) throw new Error(`Speech failed (${res.status})`)
+    return res.blob()
+  },
 }
