@@ -1,13 +1,15 @@
 import { useState } from 'react'
-import { Bookmark, RotateCcw, Trash2, TrendingUp } from 'lucide-react'
-import { fmtChf, pct } from '../format'
+import { Bookmark, Bot, RotateCcw, Trash2, TrendingUp } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { api } from '../api'
+import { fmtChf, fmtWhen, pct } from '../format'
 import { useEstimate, useStore } from '../store'
-import type { BidPoint, BidScenario, Parameters, Snapshot } from '../types'
+import type { BidPoint, BidScenario, ExperienceScenario, Parameters, Snapshot } from '../types'
 import { ParamGroup } from '../components/ParamGroup'
 import { Button, Empty } from '../components/ui'
 import { CalculatedPrice, SystemsSummary } from './BidCost'
 
-const TONE: Record<string, string> = { Aggressive: '#ff6a20', Target: '#0785ff', Conservative: '#009c7b' }
+const TONE: Record<string, string> = { Aggressive: '#ff6a20', Target: '#0785ff', Conservative: '#009c7b', Experience: '#7b5cf0' }
 
 export function Bid() {
   const e = useEstimate()
@@ -41,10 +43,11 @@ export function Bid() {
           </span>
         </div>
       </section>
-      <div className="scenario-grid">
+      <div className={`scenario-grid ${bid.experience ? 'four' : ''}`}>
         {bid.scenarios.map((s) => (
           <ScenarioCard key={s.scenario} s={s} best={s.scenario === bid.recommended} />
         ))}
+        {bid.experience && <ExperienceCard x={bid.experience} />}
       </div>
       <div className="bid-charts">
         <section className="card">
@@ -54,6 +57,7 @@ export function Bid() {
             color="#0785ff"
             curve={bid.curve}
             scenarios={bid.scenarios}
+            extra={bid.experience}
             recommended={bid.recommended}
             y={(p) => p.estimated_win_probability}
             fmt={pct}
@@ -67,6 +71,7 @@ export function Bid() {
             color="#7b61ff"
             curve={bid.curve}
             scenarios={bid.scenarios}
+            extra={bid.experience}
             recommended={bid.recommended}
             y={(p) => p.expected_contribution_chf}
             fmt={(v) => (v === 0 ? 'CHF 0' : `CHF ${Math.round(v / 1000)}k`)}
@@ -107,7 +112,36 @@ export function Bid() {
   )
 }
 
-function ScenarioCard({ s, best }: { s: BidScenario; best: boolean }) {
+/** The bid suggested from the team's experience: same scoring as the calculated scenarios, traced to the Experience tab. */
+function ExperienceCard({ x }: { x: ExperienceScenario }) {
+  const act = useStore((st) => st.act)
+  const navigate = useNavigate()
+  return (
+    <ScenarioCard s={x} best={false}>
+      <div className="experience-scenario-foot">
+        <small className="muted">
+          Range {fmtChf(x.low_chf)} – {fmtChf(x.high_chf)} · suggested by {x.model} from the team's experience · {fmtWhen(x.suggestion_at)}
+        </small>
+        <div>
+          <Button className="small" onClick={() => navigate('/experience')}>
+            Why this price?
+          </Button>
+          <button
+            className="icon-button"
+            aria-label="Remove the Experience scenario"
+            title="Remove from the bid"
+            onClick={() => act('Removing…', (tid) => api.removeSuggestionScenario(tid), 'Experience scenario removed.')}
+          >
+            <Trash2 size={14} />
+          </button>
+        </div>
+      </div>
+    </ScenarioCard>
+  )
+}
+
+function ScenarioCard({ s, best, children }: { s: BidScenario; best: boolean; children?: React.ReactNode }) {
+  const ai = s.scenario === 'Experience'
   return (
     <section className={`card scenario-card ${best ? 'best' : ''}`} style={{ '--tone': TONE[s.scenario] ?? '#0785ff' } as React.CSSProperties}>
       <div className="section-heading">
@@ -116,6 +150,11 @@ function ScenarioCard({ s, best }: { s: BidScenario; best: boolean }) {
           {s.scenario}
         </span>
         {best && <span className="badge success">Recommended</span>}
+        {ai && (
+          <span className="ai-badge">
+            <Bot size={12} /> AI suggestion
+          </span>
+        )}
       </div>
       <strong className="scenario-price">{fmtChf(s.bid_price_chf)}</strong>
       <dl>
@@ -137,6 +176,7 @@ function ScenarioCard({ s, best }: { s: BidScenario; best: boolean }) {
           <dd>{fmtChf(s.expected_contribution_chf)}</dd>
         </div>
       </dl>
+      {children}
     </section>
   )
 }
@@ -161,6 +201,7 @@ function LineChart({
   id,
   curve,
   scenarios,
+  extra,
   recommended,
   y,
   fmt,
@@ -170,6 +211,8 @@ function LineChart({
   id: string
   curve: BidPoint[]
   scenarios: BidScenario[]
+  /** drawn as a marker only, outside the scenario band (the Experience scenario) */
+  extra?: BidScenario | null
   recommended: string
   y: (p: BidPoint) => number
   fmt: (v: number) => string
@@ -238,7 +281,7 @@ function LineChart({
           <path d={area} fill={`url(#fill-${id})`} />
           <path d={path} className="line" stroke={color} filter={`url(#glow-${id})`} />
         </g>
-        {scenarios.map((s, i) => {
+        {[...scenarios, ...(extra && extra.margin_pct >= 0 && extra.margin_pct <= xMax ? [extra] : [])].map((s, i) => {
           const v = y({ ...curve[0], ...s })
           const tone = TONE[s.scenario]
           const label = s.scenario === recommended ? `${s.scenario} ★` : s.scenario

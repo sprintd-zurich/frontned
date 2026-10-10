@@ -314,6 +314,16 @@ export interface BidAnalysis {
   reference_price_chf: number
   inputs: Record<string, number>
   limits: { min_probability: number; max_probability: number }
+  /** the bid suggested from the team's experience, once added from the Experience tab */
+  experience: ExperienceScenario | null
+}
+
+export interface ExperienceScenario extends BidScenario {
+  low_chf: number
+  high_chf: number
+  suggestion_at: string
+  model: string
+  applied_at: string
 }
 
 export interface Snapshot {

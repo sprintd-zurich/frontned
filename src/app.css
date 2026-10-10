@@ -2821,3 +2821,49 @@ body.resizing img {
 .talk-entry-actions:has(.talk-saved) {
   align-items: center;
 }
+
+/* ---------- experience scenario on the bid tab ---------- */
+.scenario-grid.four {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.scenario-card .section-heading .ai-badge {
+  font-size: 9px;
+}
+.experience-scenario-foot {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+.experience-scenario-foot small {
+  font-size: 11px;
+}
+.experience-scenario-foot > div {
+  display: flex;
+  gap: 6px;
+  justify-content: space-between;
+  align-items: center;
+}
+.suggestion-apply {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  padding-top: 10px;
+  border-top: 1px solid #f0f2f6;
+  font-size: 12px;
+}
+.suggestion-apply .talk-saved {
+  margin-right: 0;
+  font-size: 12px;
+}
+@media (max-width: 1350px) {
+  .scenario-grid.four {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 700px) {
+  .scenario-grid.four {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

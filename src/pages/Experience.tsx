@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
-import { AlertTriangle, Bot, Keyboard, Lightbulb, MessageSquareQuote, Mic, Paperclip, Percent, Sparkles, Trash2 } from 'lucide-react'
+import { AlertTriangle, ArrowRight, Bot, Check, Keyboard, Lightbulb, MessageSquareQuote, Mic, Paperclip, Percent, Plus, Sparkles, Trash2 } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import { initials, systemsOf } from '../derive'
 import { fmtChf, fmtWhen } from '../format'
@@ -160,6 +161,8 @@ function SuggestionPanel() {
     return x ? x.text || x.file?.name || id : `${id} (removed)`
   }
   const stale = s ? staleness(e, s) : null
+  const applied = !!s && e.bid.experience?.suggestion_at === s.at
+  const navigate = useNavigate()
   return (
     <section className="card suggestion" id="bid-suggestion">
       <div className="suggestion-head">
@@ -278,6 +281,34 @@ function SuggestionPanel() {
                 </>
               )}
             </div>
+          </div>
+          <div className="suggestion-apply">
+            {applied ? (
+              <>
+                <span className="talk-saved">
+                  <Check size={13} /> On the Bid tab as the Experience scenario
+                </span>
+                <Button className="small" onClick={() => navigate('/bid')}>
+                  Open the Bid tab <ArrowRight size={13} />
+                </Button>
+              </>
+            ) : (
+              <>
+                <span className="muted">
+                  {e.bid.experience
+                    ? `The Bid tab shows an older suggestion (${fmtChf(e.bid.experience.bid_price_chf)}).`
+                    : 'Compare it with the calculated scenarios on the Bid tab.'}
+                </span>
+                <Button
+                  className="small"
+                  primary
+                  disabled={!!busy}
+                  onClick={() => act('Adding…', (tid) => api.applySuggestion(tid), 'Added to the Bid tab as the Experience scenario.')}
+                >
+                  <Plus size={13} /> {e.bid.experience ? 'Replace the Experience scenario' : 'Add as a bid scenario'}
+                </Button>
+              </>
+            )}
           </div>
           <small className="muted suggestion-foot">
             Written by {s.model} · {fmtWhen(s.at)} · AI suggestion, check it before you use it. Prices in the tender are unchanged.

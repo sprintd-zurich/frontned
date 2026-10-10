@@ -109,6 +109,9 @@ export const api = {
     form.append('speak', String(turn.speak))
     return call<TalkTurn>(`/api/tenders/${id}/talk`, { method: 'POST', body: form })
   },
+  applySuggestion: (id: string) => call<Estimate>(`/api/tenders/${id}/experience/suggest/apply`, { method: 'POST' }),
+  removeSuggestionScenario: (id: string) =>
+    call<Estimate>(`/api/tenders/${id}/experience/suggest/apply`, { method: 'DELETE' }),
   suggestBid: (id: string) => call<Estimate>(`/api/tenders/${id}/experience/suggest`, { method: 'POST' }),
   experienceFileUrl: (id: string, eid: string) => `${BASE}/api/tenders/${id}/experience/${eid}/file`,
 }
