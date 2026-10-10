@@ -1,4 +1,14 @@
-import type { CatalogItem, Estimate, Parameters, PositionOverride, RfqPackage } from './types'
+import type {
+  CatalogItem,
+  Estimate,
+  Meta,
+  Parameters,
+  PositionOverride,
+  RfqPackage,
+  SourceLocation,
+  Status,
+  TenderSummary,
+} from './types'
 
 const BASE = import.meta.env.VITE_API_URL ?? ''
 
@@ -6,7 +16,7 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, init)
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))
-    throw new Error(body.detail ?? `Request failed (${res.status})`)
+    throw new Error(typeof body.detail === 'string' ? body.detail : `Request failed (${res.status})`)
   }
   return res.json()
 }
@@ -17,8 +27,18 @@ const json = (method: string, body: unknown): RequestInit => ({
   body: JSON.stringify(body),
 })
 
+export interface ProductivityRule {
+  install_code: string
+  work_type: string
+  unit: string
+  base_hours_per_unit: number
+  labour_role: string
+  default_hourly_rate_chf: number
+  factor_keys: string[]
+}
+
 export const api = {
-  listTenders: () => call<{ id: string; name: string; pages: number }[]>('/api/tenders'),
+  listTenders: () => call<TenderSummary[]>('/api/tenders'),
   loadDemo: () => call<Estimate>('/api/tenders/demo', { method: 'POST' }),
   upload: (file: File) => {
     const form = new FormData()
@@ -26,8 +46,17 @@ export const api = {
     return call<Estimate>('/api/tenders', { method: 'POST', body: form })
   },
   get: (id: string) => call<Estimate>(`/api/tenders/${id}`),
+  remove: (id: string) => call<{ ok: boolean }>(`/api/tenders/${id}`, { method: 'DELETE' }),
+  setMeta: (id: string, body: Partial<Meta>) => call<Estimate>(`/api/tenders/${id}/meta`, json('PATCH', body)),
   override: (id: string, lvId: string, body: PositionOverride) =>
     call<Estimate>(`/api/tenders/${id}/positions/${lvId}`, json('PATCH', body)),
+  bulk: (id: string, body: { lv_ids: string[]; reviewed?: boolean; status?: Status }) =>
+    call<Estimate>(`/api/tenders/${id}/positions/bulk`, json('POST', body)),
+  addNote: (id: string, lvId: string, text: string, author?: string) =>
+    call<Estimate>(`/api/tenders/${id}/positions/${lvId}/notes`, json('POST', { text, author })),
+  deleteNote: (id: string, lvId: string, nid: string) =>
+    call<Estimate>(`/api/tenders/${id}/positions/${lvId}/notes/${nid}`, { method: 'DELETE' }),
+  source: (id: string, lvId: string) => call<SourceLocation>(`/api/tenders/${id}/positions/${lvId}/source`),
   setParameters: (id: string, body: Partial<Parameters>) =>
     call<Estimate>(`/api/tenders/${id}/parameters`, json('PATCH', body)),
   saveSnapshot: (id: string, name: string) => call<Estimate>(`/api/tenders/${id}/snapshots`, json('POST', { name })),
@@ -36,6 +65,7 @@ export const api = {
   rfqs: (id: string) => call<RfqPackage[]>(`/api/tenders/${id}/rfqs`),
   rfqUrl: (id: string, key: string) => `${BASE}/api/tenders/${id}/rfqs/${key}.xlsx`,
   exportUrl: (id: string) => `${BASE}/api/tenders/${id}/export.xlsx`,
+  tenderPdfUrl: (id: string) => `${BASE}/api/tenders/${id}/pdf`,
   pricedLvUrl: (id: string, inline = false) => `${BASE}/api/tenders/${id}/priced-lv.pdf${inline ? '?inline=true' : ''}`,
   pricedLvInfo: (id: string) =>
     call<{ pages: number; filled: number; positions: number; total_chf: number; key: string }>(`/api/tenders/${id}/priced-lv/info`),
@@ -43,5 +73,6 @@ export const api = {
   exportPreview: (id: string) =>
     call<{ name: string; rows: (string | number | boolean | null)[][] }[]>(`/api/tenders/${id}/export/preview`),
   catalog: () => call<CatalogItem[]>('/api/reference/catalog'),
+  productivity: () => call<ProductivityRule[]>('/api/reference/productivity'),
   pageUrl: (id: string, page: number) => `${BASE}/api/tenders/${id}/pages/${page}.png`,
 }
