@@ -27,11 +27,12 @@ const SCOPES = [
  * Kept with the tender so it can later adjust the bid scenarios from history and experience; prices are not changed yet.
  */
 const MODE = 'equans-experience-mode'
+/** Talk is the default; Write only when the estimator picked it before in this browser. */
 function savedMode(): 'talk' | 'write' {
   try {
-    return localStorage.getItem(MODE) === 'talk' ? 'talk' : 'write'
+    return localStorage.getItem(MODE) === 'write' ? 'write' : 'talk'
   } catch {
-    return 'write'
+    return 'talk'
   }
 }
 
