@@ -56,7 +56,7 @@ export function metrics(ps: Position[]) {
     assumption: priceable.filter((p) => !p.reviewed && p.status === 'assumption_applied').length,
     open: priceable.length - approved,
     value: ps.reduce((s, p) => s + p.direct_position_cost_chf, 0),
-    percent: priceable.length ? Math.round((approved / priceable.length) * 100) : 0,
+    percent: priceable.length ? Math.floor((approved / priceable.length) * 100) : 0,
   }
 }
 

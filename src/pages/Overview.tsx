@@ -235,6 +235,7 @@ function Dashboard() {
   const m = metrics(e.positions)
   const meta = e.tender.meta
   const ready = m.open === 0
+  const complete = m.priceable > 0 && m.approved === m.priceable
   const status: [string, number, string, () => void][] = [
     ['Approved', m.approved, '#009b7d', () => go('approved', '/positions')],
     ['Needs attention', m.attention, '#ff7929', () => go('decision', '/matched')],
@@ -295,9 +296,15 @@ function Dashboard() {
                 </button>
               ))}
             </div>
-            <a className={`button small report-button ${m.percent === 100 ? 'primary' : ''}`} href={api.exportUrl(e.tender.id)}>
-              <Download size={14} /> Download report
-            </a>
+            {complete ? (
+              <a className="button small primary report-button" href={api.pricedLvUrl(e.tender.id)}>
+                <Download size={14} /> Download priced tender (PDF)
+              </a>
+            ) : (
+              <button className="button small report-button" disabled title="Approve every priced position first">
+                <Download size={14} /> Download report · {m.priceable - m.approved} still to approve
+              </button>
+            )}
           </div>
         </div>
         <Workflow stepsOnly />

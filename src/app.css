@@ -2915,6 +2915,10 @@ body.resizing img {
   justify-content: center;
   text-decoration: none;
 }
+.report-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.75;
+}
 .report-button:not(.primary) {
   background: #eef1f5;
   color: #5b6b82;
