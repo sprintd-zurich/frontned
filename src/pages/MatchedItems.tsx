@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import { fmtNum, money, unit } from '../format'
 import { useEstimate, useStore } from '../store'
+import { isBenchmark, isPriceable, metrics } from '../derive'
 import type { CatalogItem, Position, Status } from '../types'
 import { Button, StatusBadge } from '../components/ui'
 import { SourceView } from '../components/SourceView'
@@ -72,9 +73,9 @@ function MatchedItemsContent() {
   const [matchedEditCost, setMatchedEditCost] = useState('')
   const [matchedEditorName, setMatchedEditorName] = useState(() => {
     try {
-      return localStorage.getItem('equans-editor-name') || e.tender.meta.estimator || 'Ashni'
+      return e.tender.meta.estimator || localStorage.getItem('equans-editor-name') || ''
     } catch {
-      return e.tender.meta.estimator || 'Ashni'
+      return e.tender.meta.estimator || ''
     }
   })
   const [matchedReason, setMatchedReason] = useState('')
@@ -185,7 +186,7 @@ function MatchedItemsContent() {
       else if (routeFilter === 'quote') matchesRoute = p.status === 'supplier_quote_required'
       else if (routeFilter === 'assumption') matchesRoute = p.status === 'assumption_applied'
       else if (routeFilter === 'approved') matchesRoute = p.reviewed
-      else if (routeFilter === 'review') matchesRoute = !p.reviewed
+      else if (routeFilter === 'review') matchesRoute = isPriceable(p) && !p.reviewed
 
       return matchesSearch && matchesCat && matchesRoute
     })
@@ -220,9 +221,10 @@ function MatchedItemsContent() {
   const stats = useMemo(() => {
     const directCatalogue = e.positions.filter((p) => p.status === 'calculated').length
     const quotes = e.positions.filter((p) => p.status === 'supplier_quote_required').length
+    const requested = e.positions.filter((p) => p.status === 'supplier_quote_required' && p.requested).length
     const assumptions = e.positions.filter((p) => p.status === 'assumption_applied').length
-    const approved = e.positions.filter((p) => p.reviewed).length
-    return { directCatalogue, quotes, assumptions, approved }
+    const m = metrics(e.positions)
+    return { directCatalogue, quotes, requested, assumptions, approved: m.approved, open: m.open }
   }, [e.positions])
 
   // Alternatives in the same category
@@ -237,10 +239,10 @@ function MatchedItemsContent() {
   const routeOptions: [RouteFilter, string][] = [
     ['all', `All (${e.positions.length})`],
     ['calculated', `Dataset priced (${stats.directCatalogue})`],
-    ['quote', `Supplier Quote Required (${stats.quotes})`],
+    ['quote', `Supplier Quote Required (${stats.quotes}${stats.requested ? ` · ${stats.requested} requested` : ''})`],
     ['assumption', `Assumption Applied (${stats.assumptions})`],
     ['approved', `Approved (${stats.approved})`],
-    ['review', `Needs Sign-off (${e.positions.length - stats.approved})`],
+    ['review', `To approve (${stats.open})`],
   ]
   const activeMatchLabel = activePosition?.match_kind === 'exact'
     ? 'Exact'
@@ -409,6 +411,7 @@ function MatchedItemsContent() {
                           <span className={`net-cost-val ${p.overridden?.includes('net_unit_cost_chf') ? 'edited-cost' : ''}`}>
                             {money(p.net_unit_cost_chf, 2)}
                             {p.overridden?.includes('net_unit_cost_chf') && <span className="override-tag"> ✎</span>}
+                            {isBenchmark(p) && <small className="benchmark-tag" title="Supplier-package benchmark from the price book, until the supplier's price comes back">estimate</small>}
                           </span>
                         ) : (
                           <button
@@ -513,7 +516,7 @@ function MatchedItemsContent() {
                 className={`button small ${activePosition.reviewed ? '' : 'primary'}`}
                 onClick={() => toggleApproval(activePosition)}
               >
-                <Check size={14} /> {activePosition.reviewed ? 'Approved ✓' : 'Approve Match'}
+                <Check size={14} /> {activePosition.reviewed ? 'Approved ✓' : 'Approve position'}
               </button>
             )}
           </div>
@@ -543,6 +546,12 @@ function MatchedItemsContent() {
                   <div style={{ fontSize: '11px', color: '#475569', marginTop: '4px' }}>
                     <b>{activePosition.system}</b> · {activePosition.quantity} {unit(activePosition.unit)}
                   </div>
+                  {activePosition.requested && !activePosition.quote && (
+                    <div className="requested-note">
+                      Price requested from {activePosition.requested.supplier || 'a supplier'} on{' '}
+                      {new Date(activePosition.requested.at).toLocaleDateString('de-CH')}, waiting for the answer
+                    </div>
+                  )}
                 </div>
 
                 {/* Matched product */}
@@ -655,7 +664,10 @@ function MatchedItemsContent() {
                         onClick={() => activePosition.status === 'supplier_quote_required' && handleToggleRoute(activePosition)}
                       >
                         <strong>Dataset</strong>
-                        <small>{activePosition.net_unit_cost_chf == null ? '—' : money(activePosition.net_unit_cost_chf, 2)} / unit</small>
+                        <small>
+                          {activePosition.net_unit_cost_chf == null ? '—' : money(activePosition.net_unit_cost_chf, 2)} / unit
+                          {isBenchmark(activePosition) && ' · estimate until the supplier answers'}
+                        </small>
                       </button>
 
                       <button

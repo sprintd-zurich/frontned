@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   ArrowRight,
-  Check,
   FileText,
   Minus,
   Pencil,
@@ -53,7 +52,7 @@ export function StructuredItems() {
 
 function StructuredItemsContent() {
   const e = useEstimate()
-  const { selected, select, override, bulk, busy } = useStore()
+  const { selected, select, override, busy } = useStore()
 
   const [search, setSearch] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
@@ -334,22 +333,6 @@ function StructuredItemsContent() {
                 )}
               </tbody>
             </table>
-          </div>
-
-          <div className="structured-list-footer">
-            <Button
-              primary
-              disabled={!!busy || e.positions.length === 0 || e.positions.every((p) => p.reviewed)}
-              onClick={() =>
-                bulk(
-                  e.positions.map((p) => p.lv_id),
-                  { reviewed: true },
-                  `${e.positions.length} items approved.`,
-                )
-              }
-            >
-              <Check size={14} /> {e.positions.every((p) => p.reviewed) ? 'All items approved' : 'Approve all items'}
-            </Button>
           </div>
 
         </div>

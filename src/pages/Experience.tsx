@@ -432,7 +432,7 @@ function NewEntry() {
       : scope === 'category'
         ? e.categories.map((c) => [c.label, c.label])
         : scope === 'position'
-          ? e.positions.map((p) => [p.lv_id, `${p.lv_id} ${p.title}`.slice(0, 70)])
+          ? e.positions.map((p) => [p.lv_id, `${p.ref ?? p.lv_id} ${p.title}`.slice(0, 70)])
           : []
   const ready = (text.trim() || file) && (scope === 'project' || ref)
   const save = async () => {

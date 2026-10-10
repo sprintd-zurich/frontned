@@ -120,8 +120,8 @@ export default function App() {
       </div>
       <footer className="app-footer">
         <span>
-          <i /> Reference data: Equans starter package (catalogue, productivity, parameters) · every number traceable to the
-          tender page
+          <i /> Price book: {estimate ? `${estimate.dataset.name} v${estimate.dataset.version}` : 'Equans starter package'} (catalogue,
+          productivity, parameters) · every number traceable to the tender page
         </span>
         {estimate && <span className="muted">Tender {estimate.tender.id}</span>}
       </footer>

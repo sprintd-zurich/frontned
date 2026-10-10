@@ -237,8 +237,8 @@ function Dashboard() {
   const ready = m.open === 0
   const status: [string, number, string, () => void][] = [
     ['Approved', m.approved, '#009b7d', () => go('approved', '/positions')],
-    ['Needs review', m.decision, '#ff7929', () => go('decision', '/matched')],
-    ['Open', m.open - m.decision, '#a7afbd', () => go('all', '/positions')],
+    ['Needs attention', m.attention, '#ff7929', () => go('decision', '/matched')],
+    ['Ready to approve', m.open - m.attention, '#a7afbd', () => go('all', '/matched')],
   ]
   function go(pill: Pill, url: string) {
     filter({ pill, system: 'all', search: '', only: null })
@@ -307,8 +307,8 @@ function Dashboard() {
           [
             [FileText, 'Total positions', String(m.total), `${m.priceable} priced · ${m.total - m.priceable} summary lines`, 'info', 'all'],
             [CheckCheck, 'Approved', String(m.approved), `${m.percent}% of priced positions`, 'success', 'approved'],
-            [Clock3, 'Needs review', String(m.decision), 'Decision or missing information', 'warning', 'decision'],
-            [MessageSquare, 'Open', String(m.open), `${m.quote} quote · ${m.assumption} assumption`, 'neutral', 'all'],
+            [Clock3, 'Needs attention', String(m.attention), 'Decision, missing information or supplier price', 'warning', 'decision'],
+            [MessageSquare, 'To approve', String(m.open), `of ${m.priceable} priced positions`, 'neutral', 'all'],
             [Database, 'Indicative price', fmtChf(e.project.selling_price_rounded_chf), `Direct cost ${fmtChf(e.project.direct_cost_chf)}`, 'info', 'value'],
           ] as const
         ).map(([I, label, value, sub, color, pill]) => (
@@ -388,7 +388,7 @@ function Milestones({ onEdit }: { onEdit: () => void }) {
     ['Tender document issued', !!meta.document_date, meta.document_date || '—'],
     ['Tender imported', true, fmtDate(e.tender.created_at)],
     [`${m.total} positions extracted and priced`, true, fmtDate(e.tender.created_at)],
-    ['Open decisions resolved', m.decision === 0, m.decision === 0 ? (lastReview ? fmtDate(lastReview.at) : 'Done') : `${m.decision} open`],
+    ['Nothing needs attention', m.attention === 0, m.attention === 0 ? (lastReview ? fmtDate(lastReview.at) : 'Done') : `${m.attention} open`],
     ['All positions approved', m.open === 0, m.open === 0 ? (lastReview ? fmtDate(lastReview.at) : 'Done') : `${m.open} open`],
     ['Offer exported', exported, exported && lastExport ? fmtDate(lastExport.at) : 'Open'],
     [

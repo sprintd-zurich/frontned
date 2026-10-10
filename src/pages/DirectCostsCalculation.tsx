@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import { fmtChf, fmtNum, unit } from '../format'
 import { useEstimate, useStore } from '../store'
+import { isBenchmark } from '../derive'
 import type { PositionOverride } from '../types'
 import { Button, StatusBadge } from '../components/ui'
 import { SourceView } from '../components/SourceView'
@@ -77,9 +78,9 @@ function DirectCostsContent() {
   const [editBaseHours, setEditBaseHours] = useState<string>('')
   const [editorName, setEditorName] = useState<string>(() => {
     try {
-      return localStorage.getItem('equans-editor-name') || e.tender.meta.estimator || 'Ashni'
+      return e.tender.meta.estimator || localStorage.getItem('equans-editor-name') || ''
     } catch {
-      return e.tender.meta.estimator || 'Ashni'
+      return e.tender.meta.estimator || ''
     }
   })
   const [costReason, setCostReason] = useState<string>('')
@@ -464,6 +465,7 @@ function DirectCostsContent() {
                               {p.overridden?.includes('net_unit_cost_chf') && (
                                 <span className="override-tag" title="Manually edited cost"> ✎</span>
                               )}
+                              {isBenchmark(p) && <small className="benchmark-tag" title="Supplier-package benchmark from the price book, until the supplier's price comes back">estimate</small>}
                             </span>
                           ) : (
                             <button
@@ -557,7 +559,7 @@ function DirectCostsContent() {
                     notify(`${activePosition.ref} marked as ${next ? 'approved' : 'reopened'}`)
                   }}
                 >
-                  <Check size={14} /> {activePosition.reviewed ? 'Approved ✓' : 'Approve Cost'}
+                  <Check size={14} /> {activePosition.reviewed ? 'Approved ✓' : 'Approve position'}
                 </button>
               )}
             </div>

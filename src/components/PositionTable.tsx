@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowUpDown, ChevronLeft, ChevronRight, Search, SlidersHorizontal, X } from 'lucide-react'
 import { PILLS, PILL_TONE, isBlocker, isDuctList, needsDecision, pillMatch, systemsOf } from '../derive'
@@ -7,7 +7,6 @@ import { useEstimate, useStore } from '../store'
 import type { Position } from '../types'
 import { Button, StatusBadge } from './ui'
 import { Traced } from './Trace'
-import { CategoryStrip } from './Shell'
 
 export type Mode = 'positions' | 'review' | 'calculation'
 
@@ -19,11 +18,11 @@ function baseFilter(ps: Position[], s: ReturnType<typeof useStore.getState>, rev
       (!review || s.pill === 'approved' || isBlocker(p)) &&
       (!s.only || s.only.ids.includes(p.lv_id)) &&
       (s.system === 'all' || p.system === s.system) &&
-      (s.category === 'all' || p.trade === s.category) &&
+      (s.category === 'all' || p.category === s.category) &&
       (s.section === 'all' || p.section === s.section) &&
       (!s.hideDucts || !isDuctList(p)) &&
       (!q ||
-        `${p.lv_id} ${p.title} ${p.variant} ${p.description} ${p.product_id ?? ''} ${p.product_description ?? ''} ${p.install_code ?? ''}`
+        `${p.ref} ${p.lv_id} ${p.title} ${p.variant} ${p.description} ${p.product_id ?? ''} ${p.product_description ?? ''} ${p.install_code ?? ''}`
           .toLowerCase()
           .includes(q)),
   )
@@ -47,7 +46,6 @@ export function Filters({ review = false }: { review?: boolean }) {
   const sections = [...new Set(e.positions.map((p) => p.section ?? ''))].filter(Boolean).sort()
   return (
     <>
-      <CategoryStrip />
       <div className="filters">
         <div className="filter-pills status-pills">
           {PILLS.map(([k, label]) => (
@@ -121,7 +119,6 @@ export function EditedTag({ p }: { p: Position }) {
 }
 
 export function PositionTable({ rows, mode = 'positions', limit = 8 }: { rows: Position[]; mode?: Mode; limit?: number }) {
-  const e = useEstimate()
   const { selected, select, clearFilters } = useStore()
   const navigate = useNavigate()
   const [page, setPage] = useState(0)
@@ -152,7 +149,6 @@ export function PositionTable({ rows, mode = 'positions', limit = 8 }: { rows: P
   const visible = ordered.slice(page * size, page * size + size)
   const calc = mode === 'calculation'
   const read = mode === 'positions'
-  const cats = Object.fromEntries(e.categories.map((c) => [c.id, c]))
   return (
     <>
       <div className="table-toolbar">
@@ -221,7 +217,6 @@ export function PositionTable({ rows, mode = 'positions', limit = 8 }: { rows: P
           </thead>
           <tbody ref={body}>
             {visible.map((p) => {
-              const c = cats[p.trade]
               return (
                 <tr
                   tabIndex={0}
@@ -239,7 +234,7 @@ export function PositionTable({ rows, mode = 'positions', limit = 8 }: { rows: P
                   {read ? (
                     <>
                       <td className="pos-cell">
-                        {p.lv_id}
+                        {p.ref ?? p.lv_id}
                         <EditedTag p={p} />
                       </td>
                       <td className="system-cell" title={p.system}>
@@ -248,11 +243,7 @@ export function PositionTable({ rows, mode = 'positions', limit = 8 }: { rows: P
                       </td>
                       <td className="num">{p.source_page}</td>
                       <td>
-                        {c && (
-                          <span className="category-tag" style={{ '--cat': c.color } as CSSProperties}>
-                            {c.label}
-                          </span>
-                        )}
+                        {p.category && <span className="category-tag product-category">{p.category}</span>}
                       </td>
                       <td className="description-cell">
                         {p.title}
@@ -264,7 +255,7 @@ export function PositionTable({ rows, mode = 'positions', limit = 8 }: { rows: P
                   ) : (
                     <>
                       <td className="pos-cell">
-                        {p.lv_id}
+                        {p.ref ?? p.lv_id}
                         <small>p. {p.source_page}</small>
                       </td>
                       <td className="description-cell">

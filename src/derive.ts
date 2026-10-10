@@ -37,6 +37,8 @@ export const hasCompanyData = (p: Position) =>
 export const isBlocker = (p: Position) => isPriceable(p) && !p.reviewed
 /** open positions a person has to act on: a decision, missing information or a supplier to contact */
 export const needsHuman = (p: Position) => needsDecision(p) || (!p.reviewed && p.status === 'supplier_quote_required')
+/** a supplier-package price from the price book: an estimate until the supplier's own price comes back */
+export const isBenchmark = (p: Position) => p.price_source === 'supplier_package' && !p.quote && !p.overridden?.includes('net_unit_cost_chf')
 export const isDuctList = (p: Position) => p.kind.startsWith('duct') || p.kind.startsWith('fitting')
 
 export function metrics(ps: Position[]) {
@@ -48,6 +50,8 @@ export function metrics(ps: Position[]) {
     priceable: priceable.length,
     approved,
     decision,
+    /** to approve and waiting on a person: a decision, missing information or a supplier price */
+    attention: priceable.filter(needsHuman).length,
     quote: priceable.filter((p) => !p.reviewed && p.status === 'supplier_quote_required').length,
     assumption: priceable.filter((p) => !p.reviewed && p.status === 'assumption_applied').length,
     open: priceable.length - approved,

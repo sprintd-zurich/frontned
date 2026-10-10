@@ -164,6 +164,13 @@ export function Validation() {
             {s.exact} of {s.total} Equans reference positions reproduced exactly
             {s.edited > 0 && <small className="validation-hero-sub">{s.edited} priced from a quote or an estimator edit</small>}
           </h1>
+          {e.dataset.id !== 'equans-starter' && (
+            <p className="validation-note">
+              <AlertTriangle size={14} /> This tender is priced with {e.dataset.name} v{e.dataset.version}. The reference figures
+              were calculated with the Equans starter package, so differences are expected until you switch back in Product
+              Matching.
+            </p>
+          )}
           <p>
             Every number below is recalculated by this tool from the tender PDF and the reference data, then compared with
             the figures Equans calculated by hand. Source: <code>{data.source}</code>

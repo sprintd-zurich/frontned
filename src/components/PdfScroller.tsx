@@ -113,7 +113,7 @@ export function PdfScroller({
           <span>/ {total}</span>
           {position && current !== position.source_page && (
             <button className="text-button" onClick={() => scrollTo(position.source_page, src?.block?.y0 ?? 0, true)}>
-              Back to {position.lv_id} (p. {position.source_page})
+              Back to {position.ref ?? position.lv_id} (p. {position.source_page})
             </button>
           )}
         </div>

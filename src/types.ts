@@ -72,6 +72,8 @@ export interface Position {
   estimated_material_basis: string | null
   /** prices for this position from uploaded product lists that differ from the current price or supplier */
   offers: ListOffer[]
+  /** a price request went to a supplier from the Supplier tab */
+  requested: { supplier: string | null; at: string } | null
 }
 
 export type TraceField =

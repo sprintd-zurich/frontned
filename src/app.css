@@ -5758,3 +5758,34 @@ samp {
   font-weight: 600;
   white-space: nowrap;
 }
+
+/* product category tag (the one category system: Damper, Ductwork, …) */
+.category-tag.product-category {
+  background: #eef2f7;
+  color: #33415c;
+  border-color: #dfe5ee;
+}
+
+/* a price request went out from the Supplier tab */
+.requested-tag {
+  color: #7c3aed;
+  font-weight: 600;
+}
+.requested-note {
+  margin-top: 6px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  background: #f4f0ff;
+  color: #5b21b6;
+  font-size: 11px;
+}
+
+/* a supplier-package benchmark price: counted in the total, but an estimate until the supplier answers */
+.benchmark-tag {
+  display: block;
+  font-size: 9.5px;
+  font-weight: 600;
+  color: #b45309;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}

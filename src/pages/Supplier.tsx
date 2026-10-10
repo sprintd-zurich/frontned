@@ -37,7 +37,7 @@ export function Supplier() {
   const rows = (items ?? [])
     .map((i) => ({ ...i, p: byId.get(i.lv_id)! }))
     .filter(({ p }) => p)
-    .filter(({ p }) => !q || `${p.lv_id} ${p.title} ${p.variant} ${p.system}`.toLowerCase().includes(q))
+    .filter(({ p }) => !q || `${p.ref} ${p.lv_id} ${p.title} ${p.variant} ${p.system}`.toLowerCase().includes(q))
   const groups = directory
     .map((sup) => ({ sup, rows: rows.filter((r) => r.supplier === sup.id) }))
     .filter((g) => g.rows.length)
@@ -141,11 +141,12 @@ export function Supplier() {
                       onClick={(ev) => ev.stopPropagation()}
                       onChange={(ev) => toggle([p.lv_id], ev.target.checked)}
                     />
-                    <span className="lv">{p.lv_id}</span>
+                    <span className="lv">{p.ref ?? p.lv_id}</span>
                     <span className="text">
                       <strong>{positionLabel(p)}</strong>
                       <small>
                         {package_title} · {p.system.split(' ')[0]} · p. {p.source_page}
+                        {p.requested && <b className="requested-tag"> · requested {new Date(p.requested.at).toLocaleDateString('de-CH')}</b>}
                       </small>
                     </span>
                     <span className="qty">
@@ -185,6 +186,7 @@ function MailDraft({
   directory: SupplierInfo[]
 }) {
   const e = useEstimate()
+  const act = useStore((st) => st.act)
   const [supplier, setSupplier] = useState('')
   const [contact, setContact] = useState('')
   const [email, setEmail] = useState('')
@@ -227,6 +229,8 @@ function MailDraft({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, supplier, contact])
   const budget = chosen.reduce((s, p) => s + p.material_cost_chf, 0)
+  // the positions now show as requested (here and in Product Matching) until a price comes back
+  const sent = () => act('Marking as requested…', (tid) => api.markRequested(tid, ids, supplier))
   const mailto = `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
   return (
     <div className="mail-draft">
@@ -294,12 +298,13 @@ function MailDraft({
             }}
           />
           <div className="mail-actions">
-            <a className="button primary small" href={mailto}>
+            <a className="button primary small" href={mailto} onClick={() => sent()}>
               <Mail size={14} /> Open in mail app
             </a>
             <Button
               className="small"
               onClick={async () => {
+                sent()
                 try {
                   await navigator.clipboard.writeText(`${subject}\n\n${body}`)
                   notify('Request copied.')
@@ -310,7 +315,7 @@ function MailDraft({
             >
               <Copy size={14} /> Copy
             </Button>
-            <a className="button small" href={api.supplierDraftUrl(e.tender.id, ids, supplier)} download>
+            <a className="button small" href={api.supplierDraftUrl(e.tender.id, ids, supplier)} download onClick={() => sent()}>
               <FileSpreadsheet size={14} /> Item list (Excel)
             </a>
             {edited && (
@@ -339,7 +344,7 @@ function PositionFacts({ p }: { p: Position }) {
     <div className="supplier-position">
       <div>
         <strong>
-          {p.lv_id} {positionLabel(p)}
+          {p.ref ?? p.lv_id} {positionLabel(p)}
         </strong>
         <small>
           {fmtNum(p.quantity)} {unit(p.unit)} · {p.system} · p. {p.source_page}

@@ -105,6 +105,8 @@ export const api = {
   supplierItems: (id: string) => call<SupplierItem[]>(`/api/tenders/${id}/supplier/items`),
   supplierDraft: (id: string, lv_ids: string[], supplier: string, contact: string) =>
     call<SupplierDraft>(`/api/tenders/${id}/supplier/draft`, json('POST', { lv_ids, supplier, contact })),
+  markRequested: (id: string, lv_ids: string[], supplier: string) =>
+    call<Estimate>(`/api/tenders/${id}/supplier/requested`, json('POST', { lv_ids, supplier })),
   supplierDraftUrl: (id: string, lvIds: string[], supplier: string) =>
     `${BASE}/api/tenders/${id}/supplier/draft.xlsx?lv_ids=${lvIds.join(',')}&supplier=${encodeURIComponent(supplier)}`,
   uploadSheet: (id: string, file: File, lvIds: string[], supplier: string) => {
