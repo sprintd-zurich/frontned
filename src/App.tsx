@@ -1,102 +1,166 @@
-import { useCallback, useEffect, useState } from 'react'
-import { api } from './api'
-import type { CatalogItem, Estimate, Parameters, PositionOverride } from './types'
-import { Landing } from './components/Landing'
-import { Header, type Tab } from './components/Header'
-import { PositionsView } from './components/PositionsView'
-import { BuildUpView } from './components/BuildUpView'
-import { BidView } from './components/BidView'
-import { RfqView } from './components/RfqView'
-import { ChecksView } from './components/ChecksView'
-import { PreviewModal, type PreviewKind } from './components/PreviewModal'
+import { useEffect, useState } from 'react'
+import { NavLink, useLocation, useNavigate } from 'react-router-dom'
+import { AlertTriangle, ArrowRight, CheckCircle2, HelpCircle, Search, X } from 'lucide-react'
+import { initials } from './derive'
+import { useStore } from './store'
+import { Button, Modal } from './components/ui'
+import { ProjectCard, SystemSidebar, Workflow } from './components/Shell'
+import { Overview, ProjectsSidebar } from './pages/Overview'
+import { Workspace } from './pages/Workspace'
+import { FaceToFace } from './pages/FaceToFace'
+import { Systems } from './pages/Systems'
+import { Bid } from './pages/Bid'
+import { Export } from './pages/Export'
+import { MetaForm } from './pages/MetaForm'
+
+const NAV = [
+  ['/', 'Overview'],
+  ['/positions', 'Positions'],
+  ['/review', 'Review'],
+  ['/systems', 'Systems'],
+  ['/calculation', 'Calculation'],
+  ['/bid', 'Bid'],
+  ['/export', 'Export'],
+] as const
 
 export default function App() {
-  const [estimate, setEstimate] = useState<Estimate | null>(null)
-  const [catalog, setCatalog] = useState<CatalogItem[]>([])
-  const [tab, setTab] = useState<Tab>('positions')
-  const [busy, setBusy] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [only, setOnly] = useState<{ label: string; ids: string[] } | null>(null)
-  const [preview, setPreview] = useState<PreviewKind | null>(null)
-  const closePreview = useCallback(() => setPreview(null), [])
-
-  const run = useCallback(async (label: string, fn: () => Promise<Estimate>) => {
-    setBusy(label)
-    setError(null)
-    try {
-      const e = await fn()
-      setEstimate(e)
-      const url = new URL(location.href)
-      url.searchParams.set('tender', e.tender.id)
-      history.replaceState(null, '', url)
-    } catch (err) {
-      setError((err as Error).message)
-    } finally {
-      setBusy(null)
-    }
-  }, [])
+  const loc = useLocation()
+  const navigate = useNavigate()
+  const { estimate, ready, init, search, filter, toast, notify, error, busy } = useStore()
+  const [modal, setModal] = useState<'' | 'help' | 'profile'>('')
+  const page = loc.pathname
+  const overview = page === '/' || !estimate
 
   useEffect(() => {
-    api.catalog().then(setCatalog).catch(() => {})
-    const id = new URLSearchParams(location.search).get('tender')
-    if (id) run('Loading estimate…', () => api.get(id))
-  }, [run])
-
-  const override = (lvId: string, body: PositionOverride) =>
-    estimate && run('Recalculating…', () => api.override(estimate.tender.id, lvId, body))
-  const setParams = (body: Partial<Parameters>) =>
-    estimate && run('Recalculating…', () => api.setParameters(estimate.tender.id, body))
-
-  if (!estimate) {
-    return (
-      <Landing
-        busy={busy}
-        error={error}
-        onDemo={() => run('Reading the tender and pricing every position…', api.loadDemo)}
-        onUpload={(f) => run(`Reading ${f.name} and pricing every position…`, () => api.upload(f))}
-        onOpen={(id) => run('Loading estimate…', () => api.get(id))}
-      />
-    )
-  }
+    init()
+  }, [init])
+  useEffect(() => {
+    window.scrollTo(0, 0)
+  }, [page])
+  useEffect(() => {
+    if (!toast) return
+    const t = setTimeout(() => notify(''), 4200)
+    return () => clearTimeout(t)
+  }, [toast, notify])
 
   return (
-    <div className="app">
-      <Header
-        estimate={estimate}
-        tab={tab}
-        onTab={setTab}
-        busy={busy}
-        onPreview={setPreview}
-        onHome={() => {
-          setEstimate(null)
-          history.replaceState(null, '', location.pathname)
-        }}
-      />
-      {error && <div className="banner error">{error}</div>}
-      {preview && <PreviewModal kind={preview} tenderId={estimate.tender.id} onClose={closePreview} />}
-      {tab === 'positions' && (
-        <PositionsView estimate={estimate} catalog={catalog} onOverride={override} only={only} onClearOnly={() => setOnly(null)} />
+    <>
+      <header className="topbar">
+        <NavLink to="/" className="brand" aria-label="EQUANS Overview">
+          EQUANS
+        </NavLink>
+        <nav>
+          {NAV.map(([url, label]) => (
+            <NavLink
+              key={url}
+              to={url}
+              end={url === '/'}
+              className={({ isActive }) => (isActive || (page === '/face-to-face' && url === '/positions') ? 'active' : '')}
+            >
+              {label}
+            </NavLink>
+          ))}
+        </nav>
+        <label className="global-search">
+          <Search size={18} />
+          <input
+            aria-label="Search positions"
+            placeholder="Search positions, products, or keywords…"
+            value={search}
+            disabled={!estimate}
+            onChange={(e) => {
+              filter({ search: e.target.value })
+              if (['/', '/systems', '/export', '/bid'].includes(page)) navigate('/positions')
+            }}
+          />
+        </label>
+        {busy && <span className="spinner" title={busy} aria-label={busy} />}
+        <button className="icon-button help" title="How it works" onClick={() => setModal('help')}>
+          <HelpCircle />
+        </button>
+        <button className="avatar" title="Estimator" onClick={() => setModal('profile')}>
+          {initials(estimate?.tender.meta.estimator)}
+        </button>
+      </header>
+      {error && (
+        <div className="error-banner" role="alert">
+          <AlertTriangle size={17} /> {error}
+          <button aria-label="Dismiss" onClick={() => useStore.setState({ error: null })}>
+            <X size={15} />
+          </button>
+        </div>
       )}
-      {tab === 'checks' && (
-        <ChecksView
-          estimate={estimate}
-          onShow={(label, ids) => {
-            setOnly({ label, ids })
-            setTab('positions')
-          }}
-        />
+      <div className={`app ${overview ? 'dashboard-shell' : ''}`}>
+        {overview ? (
+          <ProjectsSidebar />
+        ) : (
+          <>
+            <div className="workspace-top">
+              <ProjectCard />
+              <Workflow />
+            </div>
+            <SystemSidebar />
+          </>
+        )}
+        <main className={overview ? 'dashboard-main' : 'workspace-main'}>
+          {overview ? (
+            ready || estimate ? <Overview /> : <div className="loading-state"><span className="spinner" /> Connecting to the pricing API…</div>
+          ) : page === '/systems' ? (
+            <Systems />
+          ) : page === '/bid' ? (
+            <Bid />
+          ) : page === '/export' ? (
+            <Export />
+          ) : page === '/face-to-face' ? (
+            <FaceToFace />
+          ) : (
+            <Workspace mode={page === '/review' ? 'review' : page === '/calculation' ? 'calculation' : 'positions'} />
+          )}
+        </main>
+      </div>
+      <footer className="app-footer">
+        <span>
+          <i /> Reference data: Equans starter package (catalogue, productivity, parameters) · every number traceable to the
+          tender page
+        </span>
+        {estimate && <span className="muted">Tender {estimate.tender.id}</span>}
+      </footer>
+      {toast && (
+        <div className="toast" role="status">
+          <CheckCircle2 size={19} />
+          {toast}
+          <button aria-label="Close message" onClick={() => notify('')}>
+            <X size={15} />
+          </button>
+        </div>
       )}
-      {tab === 'buildup' && <BuildUpView estimate={estimate} onParams={setParams} />}
-      {tab === 'rfq' && <RfqView estimate={estimate} />}
-      {tab === 'bid' && (
-        <BidView
-          estimate={estimate}
-          onParams={setParams}
-          onSave={(name) => run('Saving scenario…', () => api.saveSnapshot(estimate.tender.id, name))}
-          onApply={(sid) => run('Restoring scenario…', () => api.applySnapshot(estimate.tender.id, sid))}
-          onDelete={(sid) => run('Removing scenario…', () => api.deleteSnapshot(estimate.tender.id, sid))}
-        />
+      {modal === 'help' && (
+        <Modal title="From tender to a first price you can defend" close={() => setModal('')}>
+          <p>Import the tender PDF. Every step below works on the real extraction and prices.</p>
+          <ol className="guide">
+            <li>Positions: every LV line with quantity, matched product, installation rule and price.</li>
+            <li>Face 2 face: the tender page next to the extracted positions, with the source line highlighted.</li>
+            <li>Review: decide the open positions, switch products, request quotes and approve.</li>
+            <li>Calculation: the cost of every position and the build-up to the selling price.</li>
+            <li>Bid: compare margins, win probability and saved scenarios.</li>
+            <li>Export: the priced tender PDF, the offer workbook and supplier RFQs.</li>
+          </ol>
+          <Button
+            primary
+            onClick={() => {
+              setModal('')
+              navigate(estimate ? '/review' : '/')
+            }}
+          >
+            {estimate ? 'Open the review queue' : 'Import a tender'} <ArrowRight size={16} />
+          </Button>
+        </Modal>
       )}
-    </div>
+      {modal === 'profile' && (
+        <Modal title="Project details" close={() => setModal('')}>
+          {estimate ? <MetaForm onDone={() => setModal('')} /> : <p>Open a tender to set its estimator and submission date.</p>}
+        </Modal>
+      )}
+    </>
   )
 }

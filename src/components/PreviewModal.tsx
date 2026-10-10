@@ -1,19 +1,15 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { ChevronLeft, ChevronRight, Download, ExternalLink, X } from 'lucide-react'
 import { api } from '../api'
 import { fmtChf } from '../format'
 
 export type PreviewKind = 'pdf' | 'excel'
 
-interface Props {
-  kind: PreviewKind
-  tenderId: string
-  onClose: () => void
-}
-
 type Info = Awaited<ReturnType<typeof api.pricedLvInfo>>
 type Sheets = Awaited<ReturnType<typeof api.exportPreview>>
 
-export function PreviewModal({ kind, tenderId, onClose }: Props) {
+/** Full-screen check of an export before it is downloaded: PDF pages as images, the workbook as tables. */
+export function PreviewModal({ kind, tenderId, onClose }: { kind: PreviewKind; tenderId: string; onClose: () => void }) {
   useEffect(() => {
     const esc = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
     document.addEventListener('keydown', esc)
@@ -23,28 +19,33 @@ export function PreviewModal({ kind, tenderId, onClose }: Props) {
       document.body.style.overflow = ''
     }
   }, [onClose])
-
   const pdf = kind === 'pdf'
   return (
-    <div className="preview-backdrop" onClick={onClose}>
-      <div className="preview" role="dialog" aria-label={pdf ? 'Priced tender preview' : 'Offer workbook preview'} onClick={(e) => e.stopPropagation()}>
+    <div className="modal-backdrop preview-backdrop" onClick={onClose}>
+      <section
+        className="modal preview"
+        role="dialog"
+        aria-modal="true"
+        aria-label={pdf ? 'Priced tender preview' : 'Offer workbook preview'}
+        onClick={(e) => e.stopPropagation()}
+      >
         {pdf ? <PdfPreview tenderId={tenderId} onClose={onClose} /> : <ExcelPreview tenderId={tenderId} onClose={onClose} />}
-      </div>
+      </section>
     </div>
   )
 }
 
-function Bar({ title, sub, children, onClose }: { title: string; sub?: string; children: React.ReactNode; onClose: () => void }) {
+function Bar({ title, sub, children, onClose }: { title: string; sub?: string; children: ReactNode; onClose: () => void }) {
   return (
     <div className="preview-bar">
-      <div className="preview-title">
-        <strong>{title}</strong>
-        {sub && <span className="muted small">{sub}</span>}
+      <div>
+        <h2>{title}</h2>
+        {sub && <small className="muted">{sub}</small>}
       </div>
-      <div className="preview-actions">
+      <div className="inline">
         {children}
-        <button className="icon" onClick={onClose} aria-label="Close preview">
-          ×
+        <button className="icon-button" onClick={onClose} aria-label="Close preview">
+          <X />
         </button>
       </div>
     </div>
@@ -84,50 +85,56 @@ function PdfPreview({ tenderId, onClose }: { tenderId: string; onClose: () => vo
     <>
       <Bar
         title="Priced tender (PDF)"
-        sub={info ? `${info.pages} pages · total ${fmtChf(info.total_chf)}` : 'Preparing the preview…'}
+        sub={info ? `${info.pages} pages · ${info.filled} of ${info.positions} positions priced · total ${fmtChf(info.total_chf)}` : 'Writing the prices into the tender…'}
         onClose={onClose}
       >
-        <a className="btn" href={api.pricedLvUrl(tenderId, true)} target="_blank" rel="noreferrer">
-          Open in new tab
+        <a className="button" href={api.pricedLvUrl(tenderId, true)} target="_blank" rel="noreferrer">
+          <ExternalLink size={15} /> Open in new tab
         </a>
-        <a className="btn primary" href={api.pricedLvUrl(tenderId)} download>
-          Download PDF
+        <a className="button primary" href={api.pricedLvUrl(tenderId)} download>
+          <Download size={15} /> Download PDF
         </a>
       </Bar>
       {info && (
         <div className="preview-nav">
-          <button className="btn small-btn" onClick={() => go(page - 1)} disabled={page <= 1} aria-label="Previous page">
-            ‹
+          <button className="icon-button" onClick={() => go(page - 1)} disabled={page <= 1} aria-label="Previous page">
+            <ChevronLeft size={16} />
           </button>
-          <label className="page-jump">
+          <label>
             Page
-            <input
-              type="number"
-              min={1}
-              max={info.pages}
-              value={page}
-              onChange={(e) => go(Number(e.target.value))}
-            />
+            <input type="number" min={1} max={info.pages} value={page} onChange={(e) => go(Number(e.target.value))} />
             of {info.pages}
           </label>
-          <button className="btn small-btn" onClick={() => go(page + 1)} disabled={page >= info.pages} aria-label="Next page">
-            ›
+          <button className="icon-button" onClick={() => go(page + 1)} disabled={page >= info.pages} aria-label="Next page">
+            <ChevronRight size={16} />
           </button>
           <span className="preview-jumps">
-            <button className="link" onClick={() => go(2)}>Cover sheet</button>
-            <button className="link" onClick={() => go(3)}>Cost summary</button>
-            {info.pages > 202 && <button className="link" onClick={() => go(203)}>Duct price annex</button>}
+            <button className="text-button" onClick={() => go(1)}>
+              Cover sheet
+            </button>
+            <button className="text-button" onClick={() => go(2)}>
+              Cost summary
+            </button>
+            {info.pages > 202 && (
+              <button className="text-button" onClick={() => go(203)}>
+                Duct price annex
+              </button>
+            )}
           </span>
         </div>
       )}
       <div className="preview-body pages" ref={scroller}>
-        {error && <div className="banner error">{error}</div>}
-        {!info && !error && <div className="preview-loading"><span className="spinner dark" /> Writing the prices into the tender…</div>}
+        {error && <div className="notice">{error}</div>}
+        {!info && !error && (
+          <div className="loading-state">
+            <span className="spinner" /> Writing the prices into the tender…
+          </div>
+        )}
         {info &&
           Array.from({ length: info.pages }, (_, i) => i + 1).map((n) => (
             <div className="preview-page" key={n} data-page={n}>
               <img src={api.pricedLvPageUrl(tenderId, n, info.key)} alt={`Page ${n}`} loading="lazy" />
-              <span className="preview-page-no">{n}</span>
+              <span>{n}</span>
             </div>
           ))}
       </div>
@@ -154,26 +161,29 @@ function ExcelPreview({ tenderId, onClose }: { tenderId: string; onClose: () => 
   const [head, ...body] = sheet?.rows ?? []
   return (
     <>
-      <Bar title="Offer (Excel)" sub={sheets ? `${sheets.length} sheets` : 'Preparing the preview…'} onClose={onClose}>
-        <a className="btn primary" href={api.exportUrl(tenderId)} download>
-          Download Excel
+      <Bar title="Offer workbook (Excel)" sub={sheets ? `${sheets.length} sheets` : 'Building the workbook…'} onClose={onClose}>
+        <a className="button primary" href={api.exportUrl(tenderId)} download>
+          <Download size={15} /> Download Excel
         </a>
       </Bar>
       {sheets && (
-        <div className="sheet-tabs" role="tablist">
+        <div className="filter-pills sheet-tabs" role="tablist">
           {sheets.map((s, i) => (
             <button key={s.name} role="tab" aria-selected={i === active} className={i === active ? 'active' : ''} onClick={() => setActive(i)}>
-              {s.name}
-              <span className="muted small"> {Math.max(s.rows.length - 1, 0)}</span>
+              {s.name} <span>{Math.max(s.rows.length - 1, 0)}</span>
             </button>
           ))}
         </div>
       )}
       <div className="preview-body sheet">
-        {error && <div className="banner error">{error}</div>}
-        {!sheets && !error && <div className="preview-loading"><span className="spinner dark" /> Building the workbook…</div>}
+        {error && <div className="notice">{error}</div>}
+        {!sheets && !error && (
+          <div className="loading-state">
+            <span className="spinner" /> Building the workbook…
+          </div>
+        )}
         {sheet && (
-          <table className="sheet-table">
+          <table className="position-table sheet-table">
             <thead>
               <tr>
                 {(head ?? []).map((h, i) => (

@@ -21,6 +21,7 @@ export interface Position {
   unit: string
   kind: string
   extracted_quantity: number | null
+  airflow_m3h: number | null
   components: { text: string; quantity: number | null; unit: string; source_page: number }[]
   product_id: string | null
   product_description: string | null
@@ -42,7 +43,59 @@ export interface Position {
   base_hours_per_unit: number | null
   overridden: string[]
   reviewed: boolean
+  notes: Note[]
   alternatives: Alternative[]
+}
+
+export interface Note {
+  id: string
+  text: string
+  author: string | null
+  at: string
+}
+
+export interface Activity {
+  at: string
+  kind: 'import' | 'change' | 'review' | 'note' | 'export' | 'scenario' | 'meta'
+  text: string
+  lv_id: string | null
+}
+
+export interface Meta {
+  project_name: string
+  client: string
+  planner: string
+  location: string
+  tender_no: string
+  project_no: string
+  trade: string
+  document_date: string
+  submission_date: string
+  estimator: string
+}
+
+export interface TenderSummary {
+  id: string
+  name: string
+  pages: number
+  positions: number
+  created_at: string
+  reviewed: number
+  meta: Meta
+}
+
+export interface Box {
+  x0: number
+  y0: number
+  x1: number
+  y1: number
+}
+
+export interface SourceLocation {
+  page: number
+  lines: Box[]
+  block: Box | null
+  match: number
 }
 
 export interface Alternative {
@@ -138,24 +191,30 @@ export interface Snapshot {
 }
 
 export interface Estimate {
-  tender: { id: string; name: string; pages: number; reviewed: string[] }
+  tender: { id: string; name: string; pages: number; reviewed: string[]; created_at: string; meta: Meta }
   positions: Position[]
   project: Project
   parameters: Parameters
   bid: BidAnalysis
   snapshots: Snapshot[]
   checks: DesignCheck[]
+  activity: Activity[]
 }
 
 export interface CatalogItem {
   product_id: string
   category: string
   subcategory: string
+  manufacturer: string
+  model: string
   description: string
   unit: string
+  list_price_chf: string
+  discount_pct: string
   net_cost_chf: number
   install_code: string
   source_type: string
+  supplier_quote_required: boolean
 }
 
 export interface PositionOverride {
