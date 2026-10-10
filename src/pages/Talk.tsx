@@ -1,21 +1,21 @@
 import { useEffect, useRef, useState } from 'react'
-import { AlertTriangle, Bot, Check, Mic, MessageSquareQuote, Percent, Send, Sparkles, Square, Volume2, VolumeX, X } from 'lucide-react'
+import { AlertTriangle, Bot, Check, Mic, MessageSquareQuote, Percent, Send, Sparkles, Square, Undo2, Volume2, VolumeX } from 'lucide-react'
 import { api } from '../api'
 import { useEstimate, useStore } from '../store'
-import type { TalkEntry } from '../types'
+import type { TalkEntry, TalkTurn } from '../types'
 import { Button } from '../components/ui'
 
 interface Message {
   role: 'user' | 'assistant'
   text: string
   entries?: TalkEntry[]
-  /** per proposed entry: saved, dismissed or still open */
-  state?: ('open' | 'saved' | 'dismissed')[]
+  /** per extracted entry: saved, or removed again with Undo */
+  state?: ('saved' | 'removed')[]
 }
 
 /**
  * Talk mode: the estimator speaks, the assistant (Apertus, voiced by ElevenLabs) asks follow-up questions and
- * proposes opinions and estimates from what was said. Nothing is saved until the estimator confirms an entry.
+ * saves the opinions and estimates it hears as Experience entries straight away; Undo removes a wrong one.
  */
 export function Talk({ onSuggest }: { onSuggest: () => void }) {
   const e = useEstimate()
@@ -58,20 +58,28 @@ export function Talk({ onSuggest }: { onSuggest: () => void }) {
     setBusy(input.audio ? 'Listening…' : 'Thinking…')
     setError(null)
     const history = messages.map((m) => ({ role: m.role, text: m.text }))
+    let turn: TalkTurn | null = null
     try {
-      const out = await api.talk(e.tender.id, { ...input, history, speak: !!voiceOn && !muted })
-      setMessages((ms) => [
-        ...ms,
-        ...(out.transcript ? [{ role: 'user' as const, text: out.transcript }] : []),
-        { role: 'assistant', text: out.reply, entries: out.entries, state: out.entries.map(() => 'open' as const) },
-      ])
-      setSpeechNote(out.speech_error)
-      play(out.audio)
-    } catch (err) {
-      setError((err as Error).message)
+      // the backend saves what it extracts and returns the updated estimate, so the entry list refreshes too
+      await act(
+        input.audio ? 'Listening…' : 'Thinking…',
+        async (tid) => {
+          turn = await api.talk(tid, { ...input, history, speak: !!voiceOn && !muted })
+          return turn.estimate
+        },
+      )
     } finally {
       setBusy(null)
     }
+    const out = turn as TalkTurn | null
+    if (!out) return // act() already shows the error
+    setMessages((ms) => [
+      ...ms,
+      ...(out.transcript ? [{ role: 'user' as const, text: out.transcript }] : []),
+      { role: 'assistant', text: out.reply, entries: out.entries, state: out.entries.map(() => 'saved' as const) },
+    ])
+    setSpeechNote(out.speech_error)
+    play(out.audio)
   }
 
   const start = async () => {
@@ -109,36 +117,13 @@ export function Talk({ onSuggest }: { onSuggest: () => void }) {
     send({ text })
   }
 
-  const decide = async (mi: number, ei: number, keep: boolean) => {
+  const undo = async (mi: number, ei: number) => {
     const entry = messages[mi].entries![ei]
-    if (keep) {
-      const ok = await act(
-        'Saving…',
-        (tid) =>
-          api.addExperience(tid, {
-            text: entry.text,
-            kind: entry.kind,
-            scope: entry.scope,
-            ref: entry.ref,
-            adjustment_pct: entry.adjustment_pct == null ? '' : String(entry.adjustment_pct),
-            author: e.tender.meta.estimator,
-            source: 'talk',
-            quote: entry.quote,
-          }),
-        'Experience saved.',
-      )
-      if (!ok) return
-    }
+    const ok = await act('Removing…', (tid) => api.deleteExperience(tid, entry.id), 'Entry removed.')
+    if (!ok) return
     setMessages((ms) =>
-      ms.map((m, i) =>
-        i === mi ? { ...m, state: m.state!.map((s, j) => (j === ei ? (keep ? 'saved' : 'dismissed') : s)) } : m,
-      ),
+      ms.map((m, i) => (i === mi ? { ...m, state: m.state!.map((st, j) => (j === ei ? 'removed' : st)) } : m)),
     )
-  }
-
-  const open = messages.flatMap((m, mi) => (m.state ?? []).map((s, ei) => [mi, ei, s] as const)).filter(([, , s]) => s === 'open')
-  const saveAll = async () => {
-    for (const [mi, ei] of open) await decide(mi, ei, true)
   }
 
   return (
@@ -150,8 +135,8 @@ export function Talk({ onSuggest }: { onSuggest: () => void }) {
           </span>
           <h2>Talk it through</h2>
           <p className="muted">
-            Say what you know about this tender. The assistant asks follow-up questions and proposes entries from your words;
-            only the ones you save are kept.
+            Say what you know about this tender. The assistant asks follow-up questions and saves the opinions and estimates it
+            hears as entries; undo any that are wrong.
           </p>
         </div>
         <button
@@ -207,17 +192,17 @@ export function Talk({ onSuggest }: { onSuggest: () => void }) {
                 </div>
                 <p>{x.text}</p>
                 {x.quote && <q>{x.quote}</q>}
-                {m.state?.[ei] === 'open' ? (
+                {m.state?.[ei] === 'saved' ? (
                   <div className="talk-entry-actions">
-                    <Button className="small" primary disabled={!!busyGlobal} onClick={() => decide(mi, ei, true)}>
-                      <Check size={13} /> Save
-                    </Button>
-                    <Button className="small" onClick={() => decide(mi, ei, false)}>
-                      <X size={13} /> Dismiss
+                    <small className="talk-saved">
+                      <Check size={12} /> Saved to the entries
+                    </small>
+                    <Button className="small" disabled={!!busyGlobal} onClick={() => undo(mi, ei)}>
+                      <Undo2 size={13} /> Undo
                     </Button>
                   </div>
                 ) : (
-                  <small className="muted">{m.state?.[ei] === 'saved' ? 'Saved to the entries' : 'Dismissed'}</small>
+                  <small className="muted">Removed</small>
                 )}
               </div>
             ))}
@@ -265,11 +250,6 @@ export function Talk({ onSuggest }: { onSuggest: () => void }) {
         )}
       </div>
       <div className="talk-foot">
-        {open.length > 1 && (
-          <Button className="small" disabled={!!busyGlobal} onClick={saveAll}>
-            <Check size={13} /> Save all {open.length} proposals
-          </Button>
-        )}
         <Button className="small" primary disabled={!e.experience.length || !thinkOn || !!busyGlobal} onClick={onSuggest}>
           <Sparkles size={13} /> Suggest a bid price from the entries
         </Button>

@@ -132,6 +132,8 @@ export interface Experience {
 }
 
 export interface TalkEntry {
+  /** id of the Experience entry it was saved as */
+  id: string
   kind: 'opinion' | 'estimate'
   text: string
   adjustment_pct: number | null
@@ -147,6 +149,7 @@ export interface TalkTurn {
   model: string | null
   audio: string | null
   speech_error: string | null
+  estimate: Estimate
 }
 
 export interface BidSuggestion {

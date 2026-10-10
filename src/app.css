@@ -2693,7 +2693,7 @@ body.resizing img {
   padding: 10px 12px;
   border-radius: 10px;
   background: white;
-  border: 1px dashed #b9a8f7;
+  border: 1px solid #9bd8c6;
 }
 .talk-entry p {
   margin: 0;
@@ -2716,11 +2716,7 @@ body.resizing img {
 .talk-entry b.down {
   color: #00876c;
 }
-.talk-entry.saved {
-  border-style: solid;
-  border-color: #9bd8c6;
-}
-.talk-entry.dismissed {
+.talk-entry.removed {
   opacity: 0.5;
 }
 .talk-entry-actions {
@@ -2813,4 +2809,15 @@ body.resizing img {
   .talk-msg {
     max-width: 100%;
   }
+}
+.talk-saved {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  margin-right: auto;
+  color: #00876c;
+  font-size: 11px;
+}
+.talk-entry-actions:has(.talk-saved) {
+  align-items: center;
 }
