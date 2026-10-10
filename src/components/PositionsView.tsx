@@ -36,6 +36,7 @@ export function PositionsView({ estimate, catalog, onOverride, only, onClearOnly
   const [statuses, setStatuses] = useState<Set<Status>>(new Set())
   const [focus, setFocus] = useState<Focus>('all')
   const [query, setQuery] = useState('')
+  const [showFilters, setShowFilters] = useState(false)
   const [selected, setSelected] = useState<string | null>(null)
   const [hideDucts, setHideDucts] = useState(false)
 
@@ -82,7 +83,7 @@ export function PositionsView({ estimate, catalog, onOverride, only, onClearOnly
 
   return (
     <div className="workspace">
-      <aside className="filters">
+      <aside className={`filters ${showFilters ? 'open' : ''}`}>
         <div className="filter-block">
           <div className="filter-title">Focus</div>
           {(
@@ -126,6 +127,9 @@ export function PositionsView({ estimate, catalog, onOverride, only, onClearOnly
 
       <section className="table-wrap">
         <div className="table-toolbar">
+          <button className="btn filters-toggle" onClick={() => setShowFilters(!showFilters)} aria-expanded={showFilters}>
+            Filters
+          </button>
           <input
             className="search"
             placeholder="Search description, product, position…"
@@ -142,7 +146,7 @@ export function PositionsView({ estimate, catalog, onOverride, only, onClearOnly
           </div>
         </div>
         <div className="table-scroll">
-          <table className="positions">
+          <table className="positions main-table">
             <thead>
               <tr>
                 <th>Position</th>

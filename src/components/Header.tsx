@@ -1,6 +1,6 @@
 import type { Estimate } from '../types'
 import { fmtChf } from '../format'
-import { api } from '../api'
+import type { PreviewKind } from './PreviewModal'
 
 export type Tab = 'positions' | 'buildup' | 'checks' | 'bid' | 'rfq'
 
@@ -10,9 +10,10 @@ interface Props {
   onTab: (t: Tab) => void
   busy: string | null
   onHome: () => void
+  onPreview: (k: PreviewKind) => void
 }
 
-export function Header({ estimate, tab, onTab, busy, onHome }: Props) {
+export function Header({ estimate, tab, onTab, busy, onHome, onPreview }: Props) {
   const ps = estimate.positions
   const priceable = ps.filter((p) => !['non_priceable', 'out_of_scope'].includes(p.status))
   const priced = priceable.filter((p) => p.direct_position_cost_chf > 0).length
@@ -52,18 +53,19 @@ export function Header({ estimate, tab, onTab, busy, onHome }: Props) {
             Supplier RFQs
           </button>
         </nav>
-        <div className="busy">{busy && <span className="spinner small" />}</div>
-        <a
-          className="btn export"
-          href={api.pricedLvUrl(estimate.tender.id)}
-          download
-          title="The tender PDF with unit prices, amounts and all totals filled in"
-        >
-          Priced tender (PDF)
-        </a>
-        <a className="btn export secondary" href={api.exportUrl(estimate.tender.id)} download>
-          Offer (Excel)
-        </a>
+        <div className="header-actions">
+          <div className="busy">{busy && <span className="spinner small" />}</div>
+          <button
+            className="btn export"
+            onClick={() => onPreview('pdf')}
+            title="Preview the tender PDF with unit prices, amounts and all totals filled in"
+          >
+            Priced tender (PDF)
+          </button>
+          <button className="btn export secondary" onClick={() => onPreview('excel')} title="Preview the offer workbook">
+            Offer (Excel)
+          </button>
+        </div>
       </div>
       <div className="kpis">
         <Kpi label="Positions found" value={String(ps.length)} sub={`${priceable.length} priceable`} />
