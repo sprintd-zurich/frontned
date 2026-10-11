@@ -35,6 +35,10 @@ export interface Position {
   adjusted_install_hours: number
   labour_cost_chf: number
   direct_position_cost_chf: number
+  /** what the priced tender prints for this position: its cost times the offer markup, or a word (offen, inbegriffen) */
+  offer_unit_price_chf: number | null
+  offer_amount_chf: number | null
+  offer_label: string | null
   status: Status
   review_required: boolean
   match_kind: string
@@ -425,6 +429,8 @@ export interface Estimate {
   bid: BidAnalysis
   /** the price the exports carry: the selected bid, or the indicative selling price */
   offer: { scenario: string | null; price_chf: number }
+  /** the one markup from cost to offer, and the per-system lumps on "Montage und Transport" and "Dienstleistungen" */
+  offer_breakdown: { markup: number | null; montage_chf: Record<string, number>; services_chf: Record<string, number> }
   snapshots: Snapshot[]
   checks: DesignCheck[]
   activity: Activity[]

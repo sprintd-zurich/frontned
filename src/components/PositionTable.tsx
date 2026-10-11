@@ -8,7 +8,7 @@ import type { Position } from '../types'
 import { Button, StatusBadge } from './ui'
 import { Traced } from './Trace'
 
-export type Mode = 'positions' | 'review' | 'calculation'
+export type Mode = 'positions' | 'review' | 'calculation' | 'offer'
 
 /** Everything but the status pill: system, search, section, duct lines, "only these". */
 function baseFilter(ps: Position[], s: ReturnType<typeof useStore.getState>, review: boolean) {
@@ -147,7 +147,9 @@ export function PositionTable({ rows, mode = 'positions', limit = 8 }: { rows: P
     body.current?.querySelector('tr.selected')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
   }, [selected, page])
   const visible = ordered.slice(page * size, page * size + size)
-  const calc = mode === 'calculation'
+  // the Export view lists the same cost columns, then the prices exactly as the priced tender prints them
+  const offer = mode === 'offer'
+  const calc = mode === 'calculation' || offer
   const read = mode === 'positions'
   return (
     <>
@@ -155,6 +157,7 @@ export function PositionTable({ rows, mode = 'positions', limit = 8 }: { rows: P
         <span>
           {rows.length} positions
           {!read && <> · CHF {money(rows.reduce((s, p) => s + p.direct_position_cost_chf, 0))} direct cost</>}
+          {offer && <> · CHF {money(rows.reduce((s, p) => s + (p.offer_amount_chf ?? 0), 0))} in the priced tender</>}
           {read && ' as read from the tender'}
         </span>
         <button className="text-button" onClick={() => setSort((sort + 1) % sorts.length)}>
@@ -199,11 +202,26 @@ export function PositionTable({ rows, mode = 'positions', limit = 8 }: { rows: P
                       <br />
                       (CHF)
                     </th>
-                    <th className="num">
-                      Unit price
-                      <br />
-                      (CHF)
-                    </th>
+                    {offer ? (
+                      <>
+                        <th className="num">
+                          Offer unit
+                          <br />
+                          price (CHF)
+                        </th>
+                        <th className="num">
+                          Offer amount
+                          <br />
+                          (CHF)
+                        </th>
+                      </>
+                    ) : (
+                      <th className="num">
+                        Unit price
+                        <br />
+                        (CHF)
+                      </th>
+                    )}
                   </>
                 ) : (
                   <>
@@ -285,7 +303,18 @@ export function PositionTable({ rows, mode = 'positions', limit = 8 }: { rows: P
                               <b>{money(p.direct_position_cost_chf)}</b>
                             </Traced>
                           </td>
-                          <td className="num">{p.quantity ? money(p.direct_position_cost_chf / p.quantity, 2) : '—'}</td>
+                          {offer ? (
+                            <>
+                              <td className="num" title="Cost times the offer markup, as printed in the priced tender">
+                                {p.offer_unit_price_chf != null ? money(p.offer_unit_price_chf, 2) : '—'}
+                              </td>
+                              <td className="num" title="As printed in the priced tender">
+                                {p.offer_amount_chf != null ? <b>{money(p.offer_amount_chf, 2)}</b> : <small>{p.offer_label}</small>}
+                              </td>
+                            </>
+                          ) : (
+                            <td className="num">{p.quantity ? money(p.direct_position_cost_chf / p.quantity, 2) : '—'}</td>
+                          )}
                         </>
                       ) : (
                         <>

@@ -322,7 +322,11 @@ function DirectCostsContent() {
           <div><small>Material</small><strong>{fmtChf(totalMaterial)}</strong></div>
           <div><small>Labour</small><strong>{fmtChf(totalLabour)}</strong><span>{totalHours.toFixed(1)} h</span></div>
           <div className="total"><small>Total cost</small><strong>{fmtChf(totalDirect)}</strong></div>
-          <div><small>Selling price</small><strong>{fmtChf(pr.selling_price_rounded_chf)}</strong></div>
+          <div title="The price the priced tender and the workbook carry">
+            <small>{e.offer.scenario ? `Offer price (${e.offer.scenario} bid)` : 'Offer price'}</small>
+            <strong>{fmtChf(e.offer.price_chf)}</strong>
+            {e.offer_breakdown?.markup ? <span>cost × {e.offer_breakdown.markup.toFixed(3)}</span> : null}
+          </div>
         </div>
       </div>
 
@@ -434,6 +438,7 @@ function DirectCostsContent() {
                     <th style={{ width: '80px', textAlign: 'right' }}>Hours</th>
                     <th style={{ width: '100px', textAlign: 'right' }}>Labour Cost</th>
                     <th style={{ width: '115px', textAlign: 'right' }}>Direct Cost</th>
+                    <th style={{ width: '115px', textAlign: 'right' }} title="As printed in the priced tender: direct cost times the offer markup">In Offer</th>
                     <th style={{ width: '60px', textAlign: 'center' }}>Status</th>
                   </tr>
                 </thead>
@@ -513,6 +518,17 @@ function DirectCostsContent() {
                             </span>
                           )}
                         </td>
+                        <td style={{ textAlign: 'right' }}>
+                          {p.offer_amount_chf != null ? (
+                            <span className="mono-cost">
+                              {fmtChf(showUnitCost ? p.offer_unit_price_chf ?? 0 : p.offer_amount_chf, showUnitCost)}
+                            </span>
+                          ) : (
+                            <small className="muted" title="Printed as a word in the priced tender; any labour is on the system's Montage und Transport line">
+                              {p.offer_label}
+                            </small>
+                          )}
+                        </td>
                         <td style={{ textAlign: 'center' }}>
                           <StatusBadge p={p} />
                         </td>
@@ -522,7 +538,7 @@ function DirectCostsContent() {
 
                   {filteredPositions.length === 0 && (
                     <tr>
-                      <td colSpan={9} style={{ textAlign: 'center', padding: '36px', color: '#94a3b8' }}>
+                      <td colSpan={10} style={{ textAlign: 'center', padding: '36px', color: '#94a3b8' }}>
                         No positions match the search or filter criteria.
                       </td>
                     </tr>

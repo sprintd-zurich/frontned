@@ -51,7 +51,7 @@ export function FaceToFace({ priced = false }: { priced?: boolean }) {
             </div>
           </div>
           {!priced && <Filters />}
-          <PositionTable rows={rows} mode={priced ? 'calculation' : 'positions'} limit={50} />
+          <PositionTable rows={rows} mode={priced ? 'offer' : 'positions'} limit={50} />
         </section>
       }
       right={
