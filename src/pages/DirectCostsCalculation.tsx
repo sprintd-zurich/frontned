@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import { fmtChf, fmtNum, unit } from '../format'
 import { useEstimate, useStore } from '../store'
+import { useAuth } from '../auth'
 import { isBenchmark, isPriceable, metrics, needsHuman } from '../derive'
 import type { PositionOverride } from '../types'
 import { Button, StatusBadge } from '../components/ui'
@@ -78,11 +79,12 @@ function DirectCostsContent() {
   const [editCost, setEditCost] = useState<string>('')
   const [editLabourRate, setEditLabourRate] = useState<string>('120')
   const [editBaseHours, setEditBaseHours] = useState<string>('')
+  const signedIn = useAuth((st) => st.user?.name)
   const [editorName, setEditorName] = useState<string>(() => {
     try {
-      return e.tender.meta.estimator || localStorage.getItem('equans-editor-name') || ''
+      return signedIn || e.tender.meta.estimator || localStorage.getItem('equans-editor-name') || ''
     } catch {
-      return e.tender.meta.estimator || ''
+      return signedIn || e.tender.meta.estimator || ''
     }
   })
   const [costReason, setCostReason] = useState<string>('')
@@ -726,7 +728,13 @@ function DirectCostsContent() {
                       <span className="field-title">Editor</span>
                       <div className="cost-input-wrapper">
                         <User size={14} color="#64748b" style={{ marginLeft: '8px' }} />
-                        <input value={editorName} onChange={(event) => setEditorName(event.target.value)} className="cost-input" />
+                        <input
+                          value={editorName}
+                          readOnly={!!signedIn}
+                          title={signedIn ? `Signed in as ${signedIn}` : undefined}
+                          onChange={(event) => setEditorName(event.target.value)}
+                          className="cost-input"
+                        />
                       </div>
                     </label>
                     <label className="cost-field grow">

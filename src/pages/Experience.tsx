@@ -5,6 +5,7 @@ import { api } from '../api'
 import { initials, systemsOf } from '../derive'
 import { fmtChf, fmtWhen } from '../format'
 import { useEstimate, useStore } from '../store'
+import { useAuth } from '../auth'
 import type { BidSuggestion, Estimate, Experience as Entry } from '../types'
 import { Button, Empty } from '../components/ui'
 import { Talk } from './Talk'
@@ -448,7 +449,7 @@ function NewEntry() {
             scope,
             ref: scope === 'project' ? '' : ref,
             adjustment_pct: kind === 'estimate' ? pct : '',
-            author: e.tender.meta.estimator,
+            author: useAuth.getState().user?.name ?? e.tender.meta.estimator,
           },
           file,
         ),

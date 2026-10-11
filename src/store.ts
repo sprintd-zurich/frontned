@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { api, type ProductivityRule } from './api'
+import { useAuth } from './auth'
 import type { Pill } from './derive'
 import type { CatalogItem, Dataset, Estimate, MaterialInflation, Meta, Parameters, PositionOverride, Status, TenderSummary } from './types'
 
@@ -229,7 +230,7 @@ export const useStore = create<State>((set, get) => {
         `Price book set to ${name}.`)
     },
     addNote: async (lvId, text, author) => {
-      await run('Saving note…', () => api.addNote(tid(), lvId, text, author ?? get().estimate?.tender.meta.estimator), 'Note saved.')
+      await run('Saving note…', () => api.addNote(tid(), lvId, text, author ?? useAuth.getState().user?.name ?? get().estimate?.tender.meta.estimator), 'Note saved.')
     },
     deleteNote: async (lvId, nid) => {
       await run('Removing note…', () => api.deleteNote(tid(), lvId, nid))

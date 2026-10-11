@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import { fmtNum, money, unit } from '../format'
 import { useEstimate, useStore } from '../store'
+import { useAuth } from '../auth'
 import { isBenchmark, isPriceable, metrics, needsHuman } from '../derive'
 import type { CatalogItem, Position, Status } from '../types'
 import { Button, StatusBadge } from '../components/ui'
@@ -79,11 +80,12 @@ function MatchedItemsContent() {
 
   // Cost editing in Matched Items
   const [matchedEditCost, setMatchedEditCost] = useState('')
+  const signedIn = useAuth((st) => st.user?.name)
   const [matchedEditorName, setMatchedEditorName] = useState(() => {
     try {
-      return e.tender.meta.estimator || localStorage.getItem('equans-editor-name') || ''
+      return signedIn || e.tender.meta.estimator || localStorage.getItem('equans-editor-name') || ''
     } catch {
-      return e.tender.meta.estimator || ''
+      return signedIn || e.tender.meta.estimator || ''
     }
   })
   const [matchedReason, setMatchedReason] = useState('')
@@ -704,6 +706,8 @@ function MatchedItemsContent() {
                             type="text"
                             placeholder="Name"
                             value={matchedEditorName}
+                            readOnly={!!signedIn}
+                            title={signedIn ? `Signed in as ${signedIn}` : undefined}
                             onChange={(ev) => setMatchedEditorName(ev.target.value)}
                             style={{ width: '100%', padding: '5px 8px', fontSize: '12px', borderRadius: '4px', border: '1px solid #cbd5e1' }}
                           />

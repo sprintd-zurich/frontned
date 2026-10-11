@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Navigate, NavLink, useLocation, useNavigate } from 'react-router-dom'
-import { AlertTriangle, ArrowRight, CheckCircle2, HelpCircle, Search, X } from 'lucide-react'
+import { AlertTriangle, ArrowRight, CheckCircle2, Eye, FileText, HelpCircle, KeyRound, LogOut, Search, Users as UsersIcon, X } from 'lucide-react'
+import { canEdit, ROLE_HELP, ROLE_LABEL, useAuth, useUser } from './auth'
 import { initials } from './derive'
 import { useStore } from './store'
 import { Button, Modal } from './components/ui'
@@ -14,6 +15,8 @@ import { Export } from './pages/Export'
 import { Supplier } from './pages/Supplier'
 import { Experience } from './pages/Experience'
 import { MetaForm } from './pages/MetaForm'
+import { PasswordForm } from './pages/SignIn'
+import { Users } from './pages/Users'
 
 const WORK = [
   ['/positions', 'Items'],
@@ -30,9 +33,12 @@ export default function App() {
   const loc = useLocation()
   const navigate = useNavigate()
   const { estimate, ready, init, search, filter, toast, notify, error, busy, askDetails, close } = useStore()
-  const [modal, setModal] = useState<'' | 'help' | 'profile'>('')
+  const user = useUser()
+  const logout = useAuth((s) => s.logout)
+  const [modal, setModal] = useState<'' | 'help' | 'profile' | 'account' | 'password'>('')
   const page = loc.pathname
-  const overview = page === '/' || !estimate
+  const usersPage = page === '/users' && user.role === 'admin'
+  const overview = !usersPage && (page === '/' || !estimate)
 
   useEffect(() => {
     init()
@@ -81,8 +87,13 @@ export default function App() {
         <button className="icon-button help" title="How it works" onClick={() => setModal('help')}>
           <HelpCircle />
         </button>
-        <button className="avatar" title="Estimator" onClick={() => setModal('profile')}>
-          {initials(estimate?.tender.meta.estimator)}
+        {user.role === 'admin' && (
+          <NavLink to="/users" className={({ isActive }) => `icon-button help ${isActive ? 'active' : ''}`} title="Users">
+            <UsersIcon />
+          </NavLink>
+        )}
+        <button className="avatar" title={`${user.name} · ${ROLE_LABEL[user.role]}`} onClick={() => setModal('account')}>
+          {initials(user.name)}
         </button>
       </header>
       {error && (
@@ -93,10 +104,18 @@ export default function App() {
           </button>
         </div>
       )}
-      <div className={`app ${overview ? 'dashboard-shell' : 'workspace-shell'}`}>
+      {!canEdit(user) && (
+        <div className="read-only-banner" role="status">
+          <Eye size={15} /> You are signed in as a viewer: you can open every tender and download the exports, but not change
+          anything.
+        </div>
+      )}
+      <div className={`app ${usersPage ? 'users-shell' : overview ? 'dashboard-shell' : 'workspace-shell'}`}>
         {overview && <ProjectsSidebar />}
-        <main className={overview ? 'dashboard-main' : `workspace-main ${page === '/supplier' ? 'split' : ''}`}>
-          {overview ? (
+        <main className={usersPage ? 'users-main' : overview ? 'dashboard-main' : `workspace-main ${page === '/supplier' ? 'split' : ''}`}>
+          {usersPage ? (
+            <Users />
+          ) : overview ? (
             ready || estimate ? <Overview /> : <div className="loading-state"><span className="spinner" /> Connecting to the pricing API…</div>
           ) : page === '/systems' ? (
             <Navigate to="/bid" replace />
@@ -159,9 +178,65 @@ export default function App() {
           </Button>
         </Modal>
       )}
-      {askDetails && estimate && (
+      {askDetails && estimate && canEdit(user) && (
         <Modal title="Project details" close={() => useStore.setState({ askDetails: false })}>
           <MetaForm onDone={() => useStore.setState({ askDetails: false })} />
+        </Modal>
+      )}
+      {modal === 'account' && (
+        <Modal title="Your account" close={() => setModal('')}>
+          <div className="account-card">
+            <span className="avatar">{initials(user.name)}</span>
+            <div>
+              <strong>{user.name}</strong>
+              <span className="muted">{user.email}</span>
+            </div>
+            <span className="badge info" title={ROLE_HELP[user.role]}>
+              <i />
+              {ROLE_LABEL[user.role]}
+            </span>
+          </div>
+          <p className="muted">{ROLE_HELP[user.role]}. Notes, approvals and the activity you add are signed with your name.</p>
+          <div className="account-actions">
+            {estimate && canEdit(user) && (
+              <Button onClick={() => setModal('profile')}>
+                <FileText size={15} /> Project details
+              </Button>
+            )}
+            {user.role === 'admin' && (
+              <Button
+                onClick={() => {
+                  setModal('')
+                  navigate('/users')
+                }}
+              >
+                <UsersIcon size={15} /> Manage users
+              </Button>
+            )}
+            <Button onClick={() => setModal('password')}>
+              <KeyRound size={15} /> Change password
+            </Button>
+            <Button
+              primary
+              onClick={() => {
+                setModal('')
+                useStore.setState({ estimate: null, tenders: [], selected: null, ready: false })
+                logout()
+              }}
+            >
+              <LogOut size={15} /> Sign out
+            </Button>
+          </div>
+        </Modal>
+      )}
+      {modal === 'password' && (
+        <Modal title="Change password" close={() => setModal('')}>
+          <PasswordForm
+            onDone={() => {
+              setModal('')
+              notify('Password changed.')
+            }}
+          />
         </Modal>
       )}
       {modal === 'profile' && (

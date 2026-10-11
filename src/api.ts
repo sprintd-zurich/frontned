@@ -16,6 +16,8 @@ import type {
   SupplierItem,
   SourceLocation,
   TenderSummary,
+  User,
+  UserRole,
 } from './types'
 
 export interface DatasetImport {
@@ -33,8 +35,15 @@ export interface DatasetImport {
 
 const BASE = import.meta.env.VITE_API_URL ?? ''
 
+/** Called when the sign-in ran out (any 401 outside the sign-in form), so the app shows the sign-in page again. */
+let signedOut = () => {}
+export function onSignedOut(fn: () => void) {
+  signedOut = fn
+}
+
 async function call<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, init)
+  if (res.status === 401 && path !== '/api/auth/login') signedOut()
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))
     throw new Error(typeof body.detail === 'string' ? body.detail : `Request failed (${res.status})`)
@@ -59,6 +68,20 @@ export interface ProductivityRule {
 }
 
 export const api = {
+  // sign-in and users
+  login: (email: string, password: string) => call<User>('/api/auth/login', json('POST', { email, password })),
+  logout: () => call<{ ok: boolean }>('/api/auth/logout', { method: 'POST' }),
+  me: () => call<User>('/api/auth/me'),
+  changePassword: (current_password: string, new_password: string) =>
+    call<User>('/api/auth/password', json('POST', { current_password, new_password })),
+  users: () => call<User[]>('/api/users'),
+  addUser: (body: { name: string; email: string; role: UserRole; password?: string }) =>
+    call<{ user: User; temporary_password: string | null }>('/api/users', json('POST', body)),
+  updateUser: (uid: string, body: Partial<Pick<User, 'name' | 'email' | 'role' | 'active'>>) =>
+    call<User>(`/api/users/${uid}`, json('PATCH', body)),
+  resetPassword: (uid: string) =>
+    call<{ user: User; temporary_password: string }>(`/api/users/${uid}/reset-password`, { method: 'POST' }),
+
   listTenders: () => call<TenderSummary[]>('/api/tenders'),
   loadDemo: () => call<Estimate>('/api/tenders/demo', { method: 'POST' }),
   upload: (file: File) => {

@@ -27,6 +27,7 @@ import { initials, isBlocker, lastOf, metrics, workflow, type Pill } from '../de
 import { fmtChf, fmtDate, fmtWhen, money, parseDay } from '../format'
 import { api } from '../api'
 import { useEstimate, useStore } from '../store'
+import { canEdit, useAuth } from '../auth'
 import type { Activity } from '../types'
 import { Button, Modal, Progress } from '../components/ui'
 import { MetaForm } from './MetaForm'
@@ -48,13 +49,16 @@ export function ProjectsSidebar() {
   const shown = tenders.filter(
     (t) => `${t.meta.project_name} ${t.name} ${t.meta.location}`.toLowerCase().includes(q.toLowerCase()) && inTab(t, tab),
   )
+  const editor = canEdit(useAuth((st) => st.user))
   return (
     <aside className="projects-sidebar">
       <div className="section-heading">
         <h3>My tenders</h3>
-        <button className="button small primary" onClick={() => setImporting(true)}>
-          <Plus size={14} /> New tender
-        </button>
+        {editor && (
+          <button className="button small primary" onClick={() => setImporting(true)}>
+            <Plus size={14} /> New tender
+          </button>
+        )}
       </div>
       <label className="search-field">
         <Search size={16} />
@@ -372,13 +376,16 @@ function Dashboard() {
 
 export function ActivityItem({ a }: { a: Activity }) {
   const estimator = useStore((s) => s.estimate?.tender.meta.estimator)
-  const who = a.kind === 'import' ? 'LV' : a.kind === 'export' ? 'EX' : initials(estimator)
+  const who = a.kind === 'import' && !a.by ? 'LV' : a.kind === 'export' && !a.by ? 'EX' : initials(a.by ?? estimator)
   return (
     <div className="activity-item">
-      <span className={`avatar tiny ${a.kind}`}>{who}</span>
+      <span className={`avatar tiny ${a.kind}`} title={a.by ?? undefined}>{who}</span>
       <div>
         {a.text}
-        <small>{fmtWhen(a.at)}</small>
+        <small>
+          {a.by ? `${a.by} · ` : ''}
+          {fmtWhen(a.at)}
+        </small>
       </div>
     </div>
   )
@@ -570,12 +577,13 @@ function ProductLists() {
       await act(`Reading ${f.name}…`, (tid) => api.uploadSheet(tid, f, [], ''), `${f.name} added to the product lists.`)
     }
   }
+  const editor = canEdit(useAuth((st) => st.user))
   const sheets = [...e.sheets].reverse()
   return (
     <section className="card product-lists">
       <div className="section-heading">
         <h3>Product lists</h3>
-        <Button primary className="small" disabled={!!busy} onClick={() => input.current?.click()}>
+        <Button primary className="small" disabled={!!busy || !editor} onClick={() => input.current?.click()}>
           <Upload size={14} /> Upload
         </Button>
       </div>

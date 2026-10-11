@@ -238,6 +238,21 @@ export interface Activity {
   kind: 'import' | 'change' | 'review' | 'note' | 'export' | 'scenario' | 'meta' | 'sheet' | 'experience' | 'dataset' | 'quote' | 'warning'
   text: string
   lv_id: string | null
+  /** the signed-in user who made the change (journal entries before sign-in have none) */
+  by?: string | null
+}
+
+export type UserRole = 'admin' | 'estimator' | 'viewer'
+
+export interface User {
+  id: string
+  name: string
+  email: string
+  role: UserRole
+  active: boolean
+  must_change_password: boolean
+  created_at: string
+  last_login_at: string | null
 }
 
 export interface Meta {
