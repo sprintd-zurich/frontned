@@ -79,6 +79,7 @@ export const api = {
     call<{ user: User; temporary_password: string | null }>('/api/users', json('POST', body)),
   updateUser: (uid: string, body: Partial<Pick<User, 'name' | 'email' | 'role' | 'active'>>) =>
     call<User>(`/api/users/${uid}`, json('PATCH', body)),
+  assignProjects: (uid: string, tender_ids: string[]) => call<User>(`/api/users/${uid}/projects`, json('PUT', { tender_ids })),
   resetPassword: (uid: string) =>
     call<{ user: User; temporary_password: string }>(`/api/users/${uid}/reset-password`, { method: 'POST' }),
 

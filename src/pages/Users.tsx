@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Copy, KeyRound, UserCheck, UserPlus, UserX } from 'lucide-react'
+import { Check, Copy, FolderOpen, KeyRound, Minus, UserCheck, UserPlus, UserX } from 'lucide-react'
 import { api } from '../api'
 import { ROLE_HELP, ROLE_LABEL, useUser } from '../auth'
 import { initials } from '../derive'
@@ -10,6 +10,18 @@ import { Badge, Button, Modal } from '../components/ui'
 
 const ROLES: UserRole[] = ['admin', 'estimator', 'viewer']
 
+/** What each role may do; the backend enforces the same rules. */
+const PERMISSIONS: [string, UserRole[]][] = [
+  ['Open the projects assigned to them', ['admin', 'estimator', 'viewer']],
+  ['Open every project', ['admin']],
+  ['Import tenders (they are assigned to what they import)', ['admin', 'estimator']],
+  ['Match, price, approve and add notes', ['admin', 'estimator']],
+  ['Supplier requests, experience, bid and project details', ['admin', 'estimator']],
+  ['Download the priced PDF, the workbook and reports', ['admin', 'estimator', 'viewer']],
+  ['Archive and delete projects', ['admin', 'estimator']],
+  ['Manage users, roles and project assignments', ['admin']],
+]
+
 /** Admin only: who can sign in to Favon and what they may do. */
 export function Users() {
   const me = useUser()
@@ -19,6 +31,9 @@ export function Users() {
   const [adding, setAdding] = useState(false)
   const [editing, setEditing] = useState<User | null>(null)
   const [secret, setSecret] = useState<{ user: User; password: string; reset: boolean } | null>(null)
+  const [assigning, setAssigning] = useState<User | null>(null)
+  const tenders = useStore((s) => s.tenders)
+  const refreshTenders = useStore((s) => s.refreshTenders)
 
   const load = useCallback(() => {
     api.users().then(setList).catch((err) => setError((err as Error).message))
@@ -75,6 +90,7 @@ export function Users() {
                 <th>Name</th>
                 <th>Email</th>
                 <th>Role</th>
+                <th>Projects</th>
                 <th>Status</th>
                 <th>Last sign-in</th>
                 <th />
@@ -105,6 +121,15 @@ export function Users() {
                         </option>
                       ))}
                     </select>
+                  </td>
+                  <td onClick={(e) => e.stopPropagation()}>
+                    {u.role === 'admin' ? (
+                      <span className="muted">All projects</span>
+                    ) : (
+                      <Button className="small" title="Choose the projects this person works on" onClick={() => setAssigning(u)}>
+                        <FolderOpen size={14} /> {u.projects?.length ? `${u.projects.length} project${u.projects.length > 1 ? 's' : ''}` : 'Assign projects'}
+                      </Button>
+                    )}
                   </td>
                   <td>
                     {!u.active ? (
@@ -144,15 +169,57 @@ export function Users() {
             </tbody>
           </table>
         </div>
-        <dl className="role-legend">
-          {ROLES.map((r) => (
-            <div key={r}>
-              <dt>{ROLE_LABEL[r]}</dt>
-              <dd className="muted">{ROLE_HELP[r]}</dd>
-            </div>
-          ))}
-        </dl>
       </section>
+      <section className="card permissions">
+        <div className="section-heading">
+          <div>
+            <h3>Role permissions</h3>
+            <p className="muted">Admins assign estimators and viewers to projects; nobody else sees a project.</p>
+          </div>
+        </div>
+        <div className="table-scroll">
+          <table className="position-table permissions-table">
+            <thead>
+              <tr>
+                <th>Permission</th>
+                {ROLES.map((r) => (
+                  <th key={r} title={ROLE_HELP[r]}>
+                    {ROLE_LABEL[r]}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {PERMISSIONS.map(([label, roles]) => (
+                <tr key={label}>
+                  <td>{label}</td>
+                  {ROLES.map((r) => (
+                    <td key={r} aria-label={roles.includes(r) ? 'Allowed' : 'Not allowed'}>
+                      {roles.includes(r) ? <Check size={16} className="allowed" /> : <Minus size={16} className="denied" />}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+      {assigning && (
+        <Modal title={`Projects of ${assigning.name}`} close={() => setAssigning(null)}>
+          <AssignForm
+            user={assigning}
+            tenders={tenders.map((t) => ({ id: t.id, label: t.meta.project_name || t.name, sub: [t.meta.location, t.archived ? 'archived' : ''].filter(Boolean).join(' · ') }))}
+            onCancel={() => setAssigning(null)}
+            onSave={async (ids) => {
+              await api.assignProjects(assigning.id, ids)
+              setAssigning(null)
+              notify(`${assigning.name} now works on ${ids.length} project${ids.length === 1 ? '' : 's'}.`)
+              load()
+              refreshTenders()
+            }}
+          />
+        </Modal>
+      )}
       {adding && (
         <Modal title="Add user" close={() => setAdding(false)}>
           <UserForm
@@ -206,6 +273,79 @@ export function Users() {
         </Modal>
       )}
     </div>
+  )
+}
+
+function AssignForm({
+  user,
+  tenders,
+  onSave,
+  onCancel,
+}: {
+  user: User
+  tenders: { id: string; label: string; sub: string }[]
+  onSave: (ids: string[]) => Promise<void>
+  onCancel: () => void
+}) {
+  const [picked, setPicked] = useState(() => new Set(user.projects ?? []))
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+  return (
+    <form
+      className="meta-form"
+      onSubmit={async (e) => {
+        e.preventDefault()
+        setBusy(true)
+        setError('')
+        try {
+          await onSave([...picked])
+        } catch (err) {
+          setError((err as Error).message)
+        } finally {
+          setBusy(false)
+        }
+      }}
+    >
+      <p className="muted">
+        {ROLE_LABEL[user.role]}s see only the projects ticked here{user.role === 'viewer' ? ' and cannot change them' : ''}.
+      </p>
+      {error && (
+        <div className="notice" role="alert">
+          {error}
+        </div>
+      )}
+      <div className="assign-list">
+        {tenders.length ? (
+          tenders.map((t) => (
+            <label key={t.id} className="check-field">
+              <input
+                type="checkbox"
+                checked={picked.has(t.id)}
+                onChange={(e) => {
+                  const next = new Set(picked)
+                  if (e.target.checked) next.add(t.id)
+                  else next.delete(t.id)
+                  setPicked(next)
+                }}
+              />
+              <span>
+                <strong>{t.label}</strong>
+                {t.sub && <small className="muted"> · {t.sub}</small>}
+                <small className="muted"> · Tender {t.id}</small>
+              </span>
+            </label>
+          ))
+        ) : (
+          <p className="muted">No projects yet. Import a tender first.</p>
+        )}
+      </div>
+      <div className="modal-actions">
+        <Button onClick={onCancel}>Cancel</Button>
+        <Button primary type="submit" disabled={busy}>
+          {busy ? 'Saving…' : 'Save projects'}
+        </Button>
+      </div>
+    </form>
   )
 }
 

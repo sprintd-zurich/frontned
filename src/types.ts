@@ -253,6 +253,8 @@ export interface User {
   must_change_password: boolean
   created_at: string
   last_login_at: string | null
+  /** tender ids assigned to this user (Users page only) */
+  projects?: string[]
 }
 
 export interface Meta {
@@ -285,6 +287,8 @@ export interface TenderSummary {
   supplier_quotes_open: number
   selling_price_chf: number
   last_activity: string
+  /** ids of the users the admin assigned to this project */
+  assigned?: string[]
 }
 
 export interface Box {

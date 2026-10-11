@@ -6038,24 +6038,6 @@ samp {
   justify-content: flex-end;
   padding-right: 6px;
 }
-.role-legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 28px;
-  margin: 14px 0 0;
-}
-.role-legend div {
-  display: flex;
-  gap: 8px;
-  align-items: baseline;
-}
-.role-legend dt {
-  font-weight: 700;
-  font-size: 12px;
-}
-.role-legend dd {
-  margin: 0;
-}
 .temp-password {
   display: flex;
   align-items: center;
@@ -6072,11 +6054,41 @@ samp {
   font-weight: 700;
   letter-spacing: 1px;
 }
-.role-legend div,
-.role-legend div:last-child {
-  border: 0;
-  padding: 0;
+.users-page .permissions {
+  margin-top: 14px;
 }
-.role-legend dd {
-  text-align: left;
+.permissions-table td:not(:first-child),
+.permissions-table th:not(:first-child) {
+  text-align: center;
+  width: 110px;
+}
+.permissions-table tbody tr {
+  cursor: default;
+}
+.permissions-table .allowed {
+  color: var(--green);
+}
+.permissions-table .denied {
+  color: #b1bdcf;
+}
+.assign-list {
+  display: grid;
+  gap: 10px;
+  max-height: 45vh;
+  overflow: auto;
+  border: 1px solid #e6ebf2;
+  border-radius: 7px;
+  padding: 12px;
+}
+.assign-list .check-field {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  white-space: normal;
+  font-size: 12px;
+}
+.assign-list input[type="checkbox"] {
+  height: 15px;
+  width: 15px;
+  accent-color: #ff751f;
 }
