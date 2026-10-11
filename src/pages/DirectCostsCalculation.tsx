@@ -323,7 +323,7 @@ function DirectCostsContent() {
           <div><small>Labour</small><strong>{fmtChf(totalLabour)}</strong><span>{totalHours.toFixed(1)} h</span></div>
           <div className="total"><small>Total cost</small><strong>{fmtChf(totalDirect)}</strong></div>
           <div title="The price the priced tender and the workbook carry">
-            <small>{e.offer.scenario ? `Offer price (${e.offer.scenario} bid)` : 'Offer price'}</small>
+            <small>{e.offer.scenario ? `Bid price (${e.offer.scenario})` : 'Bid price'}</small>
             <strong>{fmtChf(e.offer.price_chf)}</strong>
             {e.offer_breakdown?.markup ? <span>cost × {e.offer_breakdown.markup.toFixed(3)}</span> : null}
           </div>
@@ -438,7 +438,7 @@ function DirectCostsContent() {
                     <th style={{ width: '80px', textAlign: 'right' }}>Hours</th>
                     <th style={{ width: '100px', textAlign: 'right' }}>Labour Cost</th>
                     <th style={{ width: '115px', textAlign: 'right' }}>Direct Cost</th>
-                    <th style={{ width: '115px', textAlign: 'right' }} title="As printed in the priced tender: direct cost times the offer markup">In Offer</th>
+                    <th style={{ width: '115px', textAlign: 'right' }} title="Bid price as printed in the priced tender: direct cost with overhead and margin">Bid</th>
                     <th style={{ width: '60px', textAlign: 'center' }}>Status</th>
                   </tr>
                 </thead>

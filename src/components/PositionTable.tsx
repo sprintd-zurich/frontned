@@ -157,7 +157,7 @@ export function PositionTable({ rows, mode = 'positions', limit = 8 }: { rows: P
         <span>
           {rows.length} positions
           {!read && <> · CHF {money(rows.reduce((s, p) => s + p.direct_position_cost_chf, 0))} direct cost</>}
-          {offer && <> · CHF {money(rows.reduce((s, p) => s + (p.offer_amount_chf ?? 0), 0))} in the priced tender</>}
+          {offer && <> · CHF {money(rows.reduce((s, p) => s + (p.offer_amount_chf ?? 0), 0))} bid, as printed in the PDF</>}
           {read && ' as read from the tender'}
         </span>
         <button className="text-button" onClick={() => setSort((sort + 1) % sorts.length)}>
@@ -205,12 +205,12 @@ export function PositionTable({ rows, mode = 'positions', limit = 8 }: { rows: P
                     {offer ? (
                       <>
                         <th className="num">
-                          Offer unit
+                          Bid unit
                           <br />
                           price (CHF)
                         </th>
                         <th className="num">
-                          Offer amount
+                          Bid
                           <br />
                           (CHF)
                         </th>
@@ -305,7 +305,7 @@ export function PositionTable({ rows, mode = 'positions', limit = 8 }: { rows: P
                           </td>
                           {offer ? (
                             <>
-                              <td className="num" title="Cost times the offer markup, as printed in the priced tender">
+                              <td className="num" title="Bid unit price: cost with overhead and margin, as printed in the priced tender">
                                 {p.offer_unit_price_chf != null ? money(p.offer_unit_price_chf, 2) : '—'}
                               </td>
                               <td className="num" title="As printed in the priced tender">
